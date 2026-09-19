@@ -1,0 +1,121 @@
+{
+  "lod": "game",
+  "texture_res": 1024,
+  "tanks": [
+    {
+      "id": "sarych",
+      "name": "Сарыч",
+      "cls": "LT",
+      "triangles": 13156,
+      "vertices": 7108,
+      "barrel_length": 3.9,
+      "extras": [
+        "light_kit",
+        "spare_track",
+        "antenna"
+      ]
+    },
+    {
+      "id": "rys",
+      "name": "Рысь",
+      "cls": "LT",
+      "triangles": 13328,
+      "vertices": 7196,
+      "barrel_length": 4.1,
+      "extras": [
+        "skirt",
+        "light_kit",
+        "drums",
+        "antenna"
+      ]
+    },
+    {
+      "id": "boar",
+      "name": "Вепрь",
+      "cls": "MT",
+      "triangles": 13472,
+      "vertices": 7276,
+      "barrel_length": 4.5,
+      "extras": [
+        "stowage",
+        "spare_track",
+        "cables",
+        "antenna"
+      ]
+    },
+    {
+      "id": "grom",
+      "name": "Гром",
+      "cls": "MT",
+      "triangles": 13292,
+      "vertices": 7172,
+      "barrel_length": 5.0,
+      "extras": [
+        "stowage",
+        "rocket_pod",
+        "cables",
+        "antenna"
+      ]
+    },
+    {
+      "id": "korshun",
+      "name": "Коршун",
+      "cls": "TD",
+      "triangles": 13344,
+      "vertices": 7212,
+      "barrel_length": 5.8,
+      "extras": [
+        "casemate_kit",
+        "spare_track",
+        "cables",
+        "antenna"
+      ]
+    },
+    {
+      "id": "tur",
+      "name": "Тур",
+      "cls": "HT",
+      "triangles": 16748,
+      "vertices": 9004,
+      "barrel_length": 4.8,
+      "extras": [
+        "era",
+        "skirt",
+        "stowage",
+        "drums",
+        "antenna"
+      ]
+    },
+    {
+      "id": "viy",
+      "name": "Вий",
+      "cls": "HT",
+      "triangles": 15768,
+      "vertices": 8508,
+      "barrel_length": 4.7,
+      "extras": [
+        "era",
+        "skirt",
+        "log",
+        "stowage",
+        "antenna"
+      ]
+    },
+    {
+      "id": "medved",
+      "name": "Медведь",
+      "cls": "HT",
+      "triangles": 17232,
+      "vertices": 9268,
+      "barrel_length": 4.9,
+      "extras": [
+        "era",
+        "skirt",
+        "stowage",
+        "drums",
+        "spare_track",
+        "antenna"
+      ]
+    }
+  ]
+}

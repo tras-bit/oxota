@@ -4,3 +4,7 @@ __pycache__/
 .venv/
 node_modules/
 .DS_Store
+
+# Blender: промежуточные файлы и сцены (пересобираются скриптом tools/build_tanks.py)
+*.blend
+*.blend1
