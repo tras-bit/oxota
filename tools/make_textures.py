@@ -123,11 +123,12 @@ def mat_steel(rng, color, name="steel", camo=True):
         albedo = albedo * (1 - m1[..., None] * 0.42) + m1[..., None] * (albedo * np.array([0.55, 0.52, 0.50]))
         albedo = albedo * (1 - m2[..., None] * 0.35) + m2[..., None] * (albedo * np.array([1.35, 1.28, 1.12]))
     mud = np.clip((dirt - 0.55) * 3.0, 0, 1)               # налипшая грязь
-    albedo = albedo * (1 - mud[..., None] * 0.5) + mud[..., None] * np.array([0.20, 0.15, 0.10])
+    albedo = albedo * (1 - mud[..., None] * 0.34) + mud[..., None] * np.array([0.24, 0.19, 0.13])
     albedo = albedo * (1 - scr[..., None] * 0.35) + scr[..., None] * np.array([0.42, 0.44, 0.45])
     height = base * 0.5 + scr * 0.5 + mud * 0.3
-    metal = np.clip(0.82 + scr * 0.15 - mud * 0.75 - n1 * 0.05, 0, 1)
-    smooth = np.clip(0.40 + n1 * 0.08 - scr * 0.10 - mud * 0.30, 0.04, 0.95)
+    # краска — диэлектрик (металл только на царапинах до грунта), иначе машина выглядит чёрной
+    metal = np.clip(0.16 + scr * 0.52 - mud * 0.12, 0, 1)
+    smooth = np.clip(0.52 + n1 * 0.10 - scr * 0.16 - mud * 0.34, 0.06, 0.95)
     save(name, np.clip(albedo, 0, 1), height, metal, smooth)
 
 
@@ -185,6 +186,23 @@ def mat_ground(name, color, cells, detail, rough, metal=0.0):
     return _f
 
 
+def mat_dark_metal(rng):
+    """Тёмная сталь: траки, опорные катки, ствол, мелкий металл. Тёмная, тёплая, потёртая."""
+    n = tiltable(fbm(ALBEDO, 6, 6, rng))           # крупные потёртости
+    mid = tiltable(fbm(ALBEDO, 5, 24, rng))        # пятна износа
+    fine = tiltable(fbm(ALBEDO, 4, 260, rng))      # мелкая шероховатость
+    scratches = np.clip((fine - 0.60) * 3.2, 0, 1) # царапины до металла
+    wear = np.clip((n - 0.52) * 2.4, 0, 1)         # зашлифованные места
+    base = 0.14 + n * 0.10 + mid * 0.06
+    albedo = tint(base, (1.00, 1.02, 1.06))        # чуть «холодная» сталь
+    albedo = albedo * (1 - wear[..., None] * 0.45) + wear[..., None] * np.array([0.34, 0.35, 0.36])
+    albedo = albedo * (1 - scratches[..., None] * 0.5) + scratches[..., None] * np.array([0.52, 0.53, 0.55])
+    height = base + wear * 0.3 + scratches * 0.2
+    metal = np.clip(0.94 - scratches * 0.10, 0, 1)
+    smooth = np.clip(0.34 + wear * 0.34 + scratches * 0.30, 0.08, 0.92)
+    save("metal_dark", np.clip(albedo, 0, 1), height, metal, smooth)
+
+
 def mat_optics(rng):
     base = np.full((ALBEDO, ALBEDO), 0.12, np.float32)
     albedo = tint(base, (0.75, 0.95, 1.0))
@@ -199,6 +217,7 @@ def main():
     mat_steel(np.random.default_rng(SEED + 2), (0.33, 0.36, 0.42), "steel_grey")   # серо-синий
     mat_steel(np.random.default_rng(SEED + 3), (0.20, 0.28, 0.18), "steel_green")  # тёмно-зелёный
     mat_rusty(rng)
+    mat_dark_metal(rng)
     mat_rubber(rng)
     mat_concrete(rng)
     mat_wood(rng)

@@ -47,6 +47,11 @@ namespace Samsar.EditorTools
             var rustyMask = LoadTex("metal_rusty_mask.png");
             MakeMaterial("MAT_Rusty", rustyAlbedo, rustyNormal, rustyMask, 1f, new Color(1f, 1f, 1f));
 
+            var darkAlbedo = LoadTex("metal_dark_albedo.jpg");
+            var darkNormal = LoadTex("metal_dark_normal.png");
+            var darkMask = LoadTex("metal_dark_mask.png");
+            MakeMaterial("MAT_MetalDark", darkAlbedo, darkNormal, darkMask, 1f, Color.white);
+
             var concreteAlbedo = LoadTex("concrete_albedo.jpg");
             var concreteNormal = LoadTex("concrete_normal.png");
             var concreteMask = LoadTex("concrete_mask.png");
@@ -168,9 +173,12 @@ namespace Samsar.EditorTools
         static Material MapMaterial(string fbxName, string camo)
         {
             string n = (fbxName ?? "").ToLowerInvariant();
-            if (n.Contains("rubber")) return Mat("MAT_Rubber");
+            if (n.Contains("rubber") || n.Contains("tire")) return Mat("MAT_Rubber");
             if (n.Contains("optic")) return Mat("MAT_Optics");
             if (n.Contains("rust")) return Mat("MAT_Rusty");
+            // тёмная сталь: траки, катки, ствол, инструмент (после rust/optic, чтобы не перехватывать их)
+            if (n.Contains("dark") || n.Contains("metal") || n.Contains("track") ||
+                n.Contains("gun") || n.Contains("tool")) return Mat("MAT_MetalDark");
             if (n.Contains("concrete")) return Mat("MAT_Concrete");
             if (n.Contains("wood")) return Mat("MAT_Wood");
             // важно: проверку стали держим раньше листвы — у ПТ камо-текстура называется steel_green
@@ -179,6 +187,7 @@ namespace Samsar.EditorTools
                 var piece = Mat("MAT_" + camo);
                 if (piece != null) return piece;
             }
+            // только листва: раньше «green» ловило камуфляж ПТ steel_green и танк зеленел листьями
             if (n.Contains("leaf") || n.Contains("tree")) return Mat("MAT_Leaf");
             return null;
         }

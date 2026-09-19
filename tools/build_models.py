@@ -50,29 +50,52 @@ def select_only(objs):
     bpy.context.view_layer.objects.active = objs[0]
 
 
-def face_unity(root):
-    """Разворачиваем модель: в Blender «вперёд» было +Y, в Unity «вперёд» должно быть +Z.
+def flatten(root):
+    """Запекаем трансформы деталей в геометрию: у каждой детали единичная матрица.
 
-    Важно: корень сначала ставим в ноль — иначе его поворот/смещение окажется вмороженным
-    в локальные матрицы деталей (и модель уедет в Unity боком)."""
+    Экспортёр FBX держит оси и масштаб в трансформах узлов; одна ошибка в узле — и модель
+    в Unity стоит на хвосте, едет боком или выглядит стометровой. Если геометрия уже
+    в мировых координатах, ломаться нечему. Дети при этом остаются под корнем.
+    """
     root.location = (0.0, 0.0, 0.0)
     root.rotation_euler = (0.0, 0.0, 0.0)
+    root.scale = (1.0, 1.0, 1.0)
     bpy.context.view_layer.update()
+    for ob in children_recursive(root):
+        if ob.type != "MESH":
+            continue
+        mw = ob.matrix_world.copy()
+        ob.parent = None
+        ob.matrix_world = mw
+        select_only([ob])
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+        ob.parent = root
+        ob.matrix_parent_inverse = mathutils.Matrix.Identity(4)
+        ob.matrix_world = mathutils.Matrix.Identity(4)
+    bpy.context.view_layer.update()
+
+
+def face_unity(root):
+    """«Вперёд» — в +Z: в Blender модели строятся носом в +Y, в Unity вперёд смотрит +Z.
+
+    Поворот делаем ДО запекания, чтобы он оказался в самой геометрии, а не в матрицах деталей.
+    """
     R = mathutils.Matrix.Rotation(math.pi, 4, "Z")
     for ob in children_recursive(root):
         if ob.type == "MESH":
             ob.matrix_world = R @ ob.matrix_world
     bpy.context.view_layer.update()
+    flatten(root)
 
 
 def export_fbx(root_ob, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     select_only(children_recursive(root_ob))   # включает корень: масштаб единиц применяется один раз
-    # bake_space_transform НЕ включаем: с ним экспортёр размазывает масштаб единиц по вложенным
-    # узлам и детали модели схлопываются в точку (проверено сравнением вариантов экспорта).
+    # bake_space_transform=True — иерархия уже плоская (см. flatten/face_unity), поэтому экспорт
+    # кладёт геометрию прямо в осях Unity: Y — вверх, +Z — вперёд, единицы метрические.
     kwargs = dict(filepath=path, use_selection=True, object_types={"MESH", "EMPTY"},
                   path_mode="AUTO", embed_textures=False, mesh_smooth_type="FACE",
-                  axis_forward="-Z", axis_up="Y", bake_space_transform=False)
+                  axis_forward="-Z", axis_up="Y", bake_space_transform=True)
     try:
         bpy.ops.export_scene.fbx(**kwargs)
     except TypeError:
@@ -100,13 +123,13 @@ def setup_world(sun_energy=3.4, bg=1.15):
     sun = bpy.data.objects.new("Sun", bpy.data.lights.new("SunL", type="SUN"))
     sun.data.energy = sun_energy
     sun.data.angle = math.radians(3)
-    sun.rotation_euler = (math.radians(50), 0, math.radians(-125))
+    sun.rotation_euler = (math.radians(52), 0, math.radians(22))
     bpy.context.collection.objects.link(sun)
     fill = bpy.data.objects.new("Fill", bpy.data.lights.new("FillL", type="AREA"))
-    fill.data.energy = 400
+    fill.data.energy = 500
     fill.data.size = 8
-    fill.location = (9, 8, 8)
-    fill.rotation_euler = (math.radians(52), 0, math.radians(40))
+    fill.location = (9, -8, 8)
+    fill.rotation_euler = (math.radians(52), 0, math.radians(-40))
     bpy.context.collection.objects.link(fill)
     bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, 0))
     ground = bpy.context.object
@@ -115,6 +138,15 @@ def setup_world(sun_energy=3.4, bg=1.15):
         "MAT_GroundGrass", "ground_grass_albedo.jpg", "ground_grass_normal.png",
         "ground_grass_mask.png", metallic=0.0, roughness=0.8))
     return ground
+
+
+def new_camera(objs, direction=(-1.45, 1.05, 0.62), margin=1.18, lens=45):
+    """Свежая камера на нужный ракурс: старые камеры и цели удаляются, сцена обновляется."""
+    for ob in list(bpy.data.objects):
+        if ob.name.startswith("Cam") or ob.name.startswith("TrackTo"):
+            bpy.data.objects.remove(ob, do_unlink=True)
+    bpy.context.view_layer.update()
+    return render_camera(objs, direction, margin, lens)
 
 
 def render_camera(objs, direction=(-1.45, 1.05, 0.62), margin=1.18, lens=45):
@@ -202,7 +234,7 @@ def build_tanks():
     tank_lib.set_texdir(TEXDIR)
     setup_world()
     roster = []
-    slots = [(-6.5, 5.5), (6.5, 5.5), (-6.5, -7.0), (6.5, -7.0)]   # 2×2 для рендера
+    slots = [(-6.3, 4.4), (6.3, 4.4), (-6.3, -6.6), (6.3, -6.6)]   # 2×2 для рендера
     for i, (key, spec) in enumerate(tank_lib.SPECS.items()):
         r = tank_lib.build_tank(spec)
         face_unity(r)                                     # ориентация — при корне в нуле
@@ -215,8 +247,19 @@ def build_tanks():
         parts = len([o for o in children_recursive(r) if o.type == "MESH"])
         print("   %-14s деталей: %3d, FBX: %6.0f КБ" % (spec.title, parts, kb))
     allmesh = [o for r in roster for o in children_recursive(r) if o.type == "MESH"]
-    render_camera(allmesh, direction=(-0.85, 1.30, 0.80), margin=0.95, lens=58)
+    new_camera(allmesh, direction=(0.60, -1.55, 0.30), margin=0.97, lens=62)
     render(os.path.join(GEN, "lineup.png"), res=(1600, 900), samples=48)
+    for i, r in enumerate(roster):                        # крупный план СТ: убрать остальных
+        if i != 1:
+            r.location.y -= 400.0
+    mtmesh = [o for o in children_recursive(roster[1]) if o.type == "MESH"]
+    new_camera(mtmesh, direction=(1.35, -1.10, 0.42), margin=0.92, lens=70)
+    render(os.path.join(GEN, "tank_detail.png"), res=(1600, 900), samples=42)
+
+    for i, r in enumerate(roster):                        # плотный 2×2: все четыре крупно
+        r.location = ((i % 2) * 9.6 - 4.8, 3.9 if i < 2 else -3.9, 0.0)
+    new_camera(allmesh, direction=(0.62, -1.50, 0.34), margin=0.99, lens=86)
+    render(os.path.join(GEN, "tank_roster.png"), res=(1600, 900), samples=42)
     verify([os.path.join(GAME_MODELS, "Tanks", s.key + ".fbx") for s in tank_lib.SPECS.values()])
 
 
@@ -246,8 +289,8 @@ def build_props():
             ob.location.y += 1000.0 + gy
             ob.location.x += gx
             shown.append(ob)
-    render_camera([o for o in shown if o.type == "MESH"],
-                  direction=(-0.9, 1.1, 0.55), margin=1.02, lens=40)
+    new_camera([o for o in shown if o.type == "MESH"],
+               direction=(-0.9, 1.1, 0.55), margin=1.02, lens=40)
     render(os.path.join(GEN, "props.png"), res=(1600, 900), samples=48)
     verify([os.path.join(GAME_MODELS, "Props", n + ".fbx") for n in props_lib.BUILDERS])
 
