@@ -269,7 +269,7 @@ namespace Samsar.EditorTools
             foreach (var spec in TankSpec.Roster)
             {
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Tanks/" + spec.id + ".prefab");
-                entries.Add(new TankLibrary.Entry { id = spec.modelName, model = prefab });
+                entries.Add(new TankLibrary.Entry { id = spec.id, model = prefab });
             }
             lib.tanks = entries.ToArray();
             bm.library = lib;

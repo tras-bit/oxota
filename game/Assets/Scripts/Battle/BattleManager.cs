@@ -115,7 +115,7 @@ namespace Samsar
         public TankController SpawnTank(string specId, bool isPlayer, bool isAlly, string callsign, Vector3 pos)
         {
             var spec = TankSpec.Get(specId);
-            var model = library != null ? library.Get(spec.modelName) : null;
+            var model = library != null ? library.Get(spec.id) : null;
             GameObject go;
             if (model != null)
             {

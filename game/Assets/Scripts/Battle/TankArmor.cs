@@ -79,8 +79,15 @@ namespace Samsar
         {
             float armor = ArmorFor(zone);
             float mult = 1f;
-            if (zone == ModuleType.Hull && Vector3.Dot(shellDir, tank.transform.forward) > 0f)
-                mult = 1.35f;   // удар в лоб — броня толще
+            if (zone == ModuleType.Hull && tank != null)
+            {
+                // Откуда пришёл снаряд: корма тоньше лобовой плиты, борт — между ними.
+                // Угол наклона уже учитывается нормалью попадания в DamageSystem.
+                float along = Vector3.Dot(shellDir.normalized, tank.transform.forward);
+                if (along > 0.35f) armor = spec.armorRear * armorMult_;          // удар в корму
+                else if (along > -0.35f) armor = spec.armorHull * 0.7f * armorMult_; // удар в борт
+                // иначе — в лобовую плиту: полная thickness
+            }
             var res = DamageSystem.Resolve(armor, shellDir, normal, penetration, damage, zone,
                                            mult, distance, Random.value);
 

@@ -65,7 +65,7 @@ namespace Samsar.EditorTools
             foreach (var spec in TankSpec.Roster)
             {
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Tanks/" + spec.id + ".prefab");
-                entries.Add(new TankLibrary.Entry { id = spec.modelName, model = prefab });
+                entries.Add(new TankLibrary.Entry { id = spec.id, model = prefab });   // ключ — как у TankSpec.id: так его ищут AngarUI и TankRegistry
             }
             lib.tanks = entries.ToArray();
 

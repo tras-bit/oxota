@@ -47,37 +47,37 @@ namespace Samsar
         {
             new TankSpec {
                 id = "lt", title = "ЛТ «Ветер»", modelName = "lt", cls = TankClass.LT,
-                hp = 700f, maxSpeed = 18f, reverseSpeed = 7f, accel = 7.5f, turnRate = 62f,
-                turretTraverse = 46f, reload = 3.6f, damage = 150f, penetration = 130f,
+                hp = 650f, maxSpeed = 18f, reverseSpeed = 7f, accel = 7.5f, turnRate = 62f,
+                turretTraverse = 46f, reload = 2.6f, damage = 170f, penetration = 185f,
                 shellSpeed = 240f, dispersion = 0.38f, aimTime = 1.7f, viewRange = 380f,
-                armorHull = 45f, armorTurret = 60f, armorRear = 30f, shells = 28,
+                armorHull = 40f, armorTurret = 55f, armorRear = 25f, shells = 32,
                 width = 2.9f, length = 5.6f, hullHeight = 0.95f,
                 ability2 = "smoke", color = "#6d7b3f"
             },
             new TankSpec {
                 id = "mt", title = "СТ «Варяг»", modelName = "mt", cls = TankClass.MT,
                 hp = 900f, maxSpeed = 14f, reverseSpeed = 6f, accel = 5.8f, turnRate = 50f,
-                turretTraverse = 38f, reload = 5.2f, damage = 220f, penetration = 165f,
+                turretTraverse = 38f, reload = 4.6f, damage = 240f, penetration = 200f,
                 shellSpeed = 220f, dispersion = 0.35f, aimTime = 2.2f, viewRange = 350f,
-                armorHull = 80f, armorTurret = 110f, armorRear = 45f, shells = 24,
+                armorHull = 75f, armorTurret = 105f, armorRear = 40f, shells = 26,
                 width = 3.2f, length = 6.6f, hullHeight = 1.05f,
                 ability2 = "repair", color = "#8b7c4a"
             },
             new TankSpec {
                 id = "ht", title = "ТТ «Гранит»", modelName = "ht", cls = TankClass.HT,
-                hp = 1400f, maxSpeed = 10.5f, reverseSpeed = 4.5f, accel = 4.2f, turnRate = 40f,
-                turretTraverse = 28f, reload = 8.4f, damage = 340f, penetration = 210f,
+                hp = 1250f, maxSpeed = 10.5f, reverseSpeed = 4.5f, accel = 4.2f, turnRate = 40f,
+                turretTraverse = 28f, reload = 5.2f, damage = 420f, penetration = 240f,
                 shellSpeed = 190f, dispersion = 0.42f, aimTime = 3.0f, viewRange = 330f,
-                armorHull = 130f, armorTurret = 160f, armorRear = 60f, shells = 18,
+                armorHull = 100f, armorTurret = 145f, armorRear = 50f, shells = 20,
                 width = 3.9f, length = 7.4f, hullHeight = 1.20f,
                 ability2 = "fire_ring", color = "#5b6675"
             },
             new TankSpec {
                 id = "td", title = "ПТ «Гроза»", modelName = "td", cls = TankClass.TD,
-                hp = 850f, maxSpeed = 12f, reverseSpeed = 5f, accel = 4.8f, turnRate = 42f,
-                turretTraverse = 16f, reload = 11.5f, damage = 500f, penetration = 265f,
+                hp = 800f, maxSpeed = 12f, reverseSpeed = 5f, accel = 4.8f, turnRate = 42f,
+                turretTraverse = 16f, reload = 9.5f, damage = 540f, penetration = 290f,
                 shellSpeed = 260f, dispersion = 0.28f, aimTime = 3.4f, viewRange = 360f,
-                armorHull = 100f, armorTurret = 120f, armorRear = 40f, shells = 14,
+                armorHull = 90f, armorTurret = 110f, armorRear = 40f, shells = 16,
                 width = 3.3f, length = 7.0f, hullHeight = 1.15f,
                 ability2 = "camouflage", color = "#4d5a38"
             },

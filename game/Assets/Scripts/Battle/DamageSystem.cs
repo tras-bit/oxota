@@ -35,8 +35,8 @@ namespace Samsar
             float eff = EffectiveArmor(thickness * armorMult, shellDir, normal);
             r.effectiveArmor = eff;
 
-            // падение пробития с дистанцией: −8% на каждые 100 м
-            float pen = penetration * (1f - Mathf.Min(0.25f, distance / 100f * 0.08f));
+            // падение пробития с дистанцией: −5% на каждые 100 м (снаряд теряет скорость плавно)
+            float pen = penetration * (1f - Mathf.Min(0.20f, distance / 100f * 0.05f));
             // нормализация бронебойного снаряда: до −8° при большом калибре (упрощённо)
             float impactAngle = Vector3.Angle(shellDir, -normal);
             if (pen >= 120f && impactAngle > 60f) eff *= 0.92f;
