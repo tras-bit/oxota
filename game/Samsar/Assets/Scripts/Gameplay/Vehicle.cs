@@ -478,8 +478,6 @@ namespace Samsar
 
             // трофей с техники
             LootSystem.SpawnTrophy(transform.position + Vector3.up * 0.6f, Level, Stats.MaxHealth);
-            if (RespawnCharges > 0 && BattleManager.Instance != null && BattleManager.Instance.State.IsRunning)
-                RespawnCharges--;
 
             var battle = BattleManager.Instance;
             if (battle != null) battle.RegisterDeath(this, killer);

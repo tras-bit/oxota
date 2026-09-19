@@ -28,6 +28,16 @@ namespace Samsar
             }
             float dt = Time.deltaTime;
 
+            // во время отсчёта машина стоит, игрок выбирает точку старта
+            var battle = BattleManager.Instance;
+            if (battle != null && battle.State.State != BattleState.Running)
+            {
+                Controller.MoveInput = Vector2.zero;
+                Controller.Brake = true;
+                if (AudioBus.Instance != null) AudioBus.Instance.Engine(0.12f);
+                return;
+            }
+
             // ==== движение ====
             float throttle = 0f;
             if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) throttle += 1f;

@@ -50,6 +50,11 @@ namespace Samsar
             float dt = Time.deltaTime;
             var battle = BattleManager.Instance;
             if (battle == null) return;
+            if (battle.State.State != BattleState.Running)
+            {
+                if (Controller != null) { Controller.MoveInput = Vector2.zero; Controller.Brake = true; }
+                return;
+            }
 
             retargetTimer -= dt;
             abilityCheckTimer -= dt;

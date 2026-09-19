@@ -667,7 +667,7 @@ def setup_preview(center, radius, direction=(-1.15, -1.65, 0.72)):
     bpy.context.collection.objects.link(rim)
 
     ground = add_cube("Ground", (400, 0.2, 400), (0, -0.1, 0),
-                      mat=new_material("GroundMat", (0.16, 0.17, 0.13), 0.0, 0.95))
+                      mat=new_material("GroundMat", (0.24, 0.25, 0.20), 0.0, 0.95))
 
     cam_data = bpy.data.cameras.new("Cam")
     cam_data.lens = 45
@@ -709,6 +709,14 @@ def render_preview(path, samples=40, res=(960, 540)):
     sc.render.filepath = path
     try:
         sc.view_settings.look = "AgX - Medium High Contrast"
+    except Exception:
+        try:
+            sc.view_settings.look = "Medium High Contrast"
+        except Exception:
+            pass
+    # немного светлее: превью читаемее на слабых экранах
+    try:
+        sc.view_settings.exposure = 0.75
     except Exception:
         pass
     bpy.ops.render.render(write_still=True)

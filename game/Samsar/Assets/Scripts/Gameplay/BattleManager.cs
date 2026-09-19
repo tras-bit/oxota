@@ -281,6 +281,7 @@ namespace Samsar
             if (State.State != BattleState.Running) return;
 
             State.TimeLeft -= dt;
+            UpdateBotRespawns();
             UpdateZone(dt);
             UpdateLoot(dt);
             UpdateAlive();
@@ -293,9 +294,40 @@ namespace Samsar
             }
         }
 
+        /// <summary>Боты, у которых есть заряд «Возрождение», возвращаются в бой через 8 секунд.</summary>
+        void UpdateBotRespawns()
+        {
+            if (RangeMode) return;
+            if (Time.time - BattleStartTime > GameConfig.RespawnWindow) return;
+            for (int i = 0; i < bots.Count; i++)
+            {
+                var bot = bots[i];
+                if (bot == null || !bot.IsBot || bot.Alive || bot.RespawnCharges <= 0) continue;
+                if (Time.time - bot.DeathTime < 8f) continue;
+                bot.RespawnCharges--;
+                Vector3 pos = Map.FindSpawnPoint(State.ZoneCenter, Mathf.Max(120f, State.ZoneRadius * 0.75f));
+                bot.Respawn(pos);
+            }
+        }
+
         void BeginBattle()
         {
             State.State = BattleState.Running;
+            // вернуть камеру игроку
+            if (mainCamera != null)
+            {
+                var rig = mainCamera.GetComponent<PlayerCameraRig>();
+                if (rig != null)
+                {
+                    rig.enabled = true;
+                    if (PlayerVehicle != null) rig.SetTarget(PlayerVehicle.transform, PlayerVehicle);
+                    mainCamera.transform.position = PlayerVehicle != null
+                        ? PlayerVehicle.transform.position + PlayerVehicle.transform.forward * -14f + Vector3.up * 5f
+                        : mainCamera.transform.position;
+                }
+            }
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
             BattleStartTime = Time.time;
             AirdropTimer = GameConfig.AirDropInterval;
             CrateTimer = 0f;

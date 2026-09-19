@@ -36,7 +36,7 @@ namespace Samsar
             if (Vehicle.RingUntil > Time.time) mobility *= 0.95f;
 
             // ==== ориентация по грунту ====
-            RaycastHit hit;
+            RaycastHit hit = default(RaycastHit);
             bool grounded = false;
             var groundHits = Physics.RaycastAll(transform.position + Vector3.up * 3f, Vector3.down, 14f, ~0, QueryTriggerInteraction.Ignore);
             System.Array.Sort(groundHits, (a, b) => a.distance.CompareTo(b.distance));
@@ -105,7 +105,6 @@ namespace Samsar
             Vector3 vertical = new Vector3(0f, rb.velocity.y, 0f);
 
             // сопротивление и потери на бездорожье
-            if (!grounded && airborneTime > 0.1f) { }
             rb.velocity = newPlanar + vertical;
 
             // трение о грунт: убираем боковое скольжение (танк не дрифтует)
