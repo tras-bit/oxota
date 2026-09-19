@@ -1,13 +1,15 @@
-// Сборка машины из FBX-модели: иерархия корпус/башня/орудие, коллайдеры зон, эффекты.
+// Сборка машины из FBX-модели: иерархия корпус/башня/орудие, коллайдеры зон, эффекты,
+// анимация ходовой (катки, подвеска), откат ствола, следы гусениц и пыль.
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace Samsar
 {
-    /// <summary>Готовит модель к бою: делит на корпус/башню/орудие, ставит коллайдеры и HitZone.</summary>
+    /// <summary>Готовит модель к бою: делит на корпус/башню/орудие, ставит коллайдеры, оживляет ходовую.</summary>
     public class TankRig : MonoBehaviour
     {
         public Transform HullRoot { get; private set; }
+        public Transform BodyRoot { get; private set; }     // качающаяся часть корпуса (подвеска)
         public Transform TurretPivot { get; private set; }
         public Transform GunPivot { get; private set; }
         public Transform GunTip { get; private set; }
@@ -16,16 +18,42 @@ namespace Samsar
         readonly List<HitZone> zones = new List<HitZone>();
         bool built;
 
+        TankController owner;
+        TankSpec spec;
+
+        // ходовая
+        struct Wheel { public Transform t; public float r; }
+        readonly List<Wheel> wheels = new List<Wheel>();
+        readonly List<ParticleSystem> dusts = new List<ParticleSystem>();
+        readonly List<Transform> marks = new List<Transform>();
+        int markIndex;
+        float markDist;
+        Transform markParent;
+
+        // подвеска/откат
+        Vector3 gunRestLocal;
+        float recoil, pitch, roll, bobPhase;
+        float driveSpeed, driveSteer, driveThrottle;
+
         static readonly string[] TurretParts =
         { "_turret", "_mantlet", "_cupola", "_hatch", "_vision", "_sight", "_aa_mg",
           "_basket", "_smoke", "_antenna", "_casemate", "_cas_" };
         static readonly string[] GunParts = { "_gun", "_muzzle" };
+        static readonly string[] GearParts =
+        { "_track", "_wheel", "_sprocket", "_idler", "_roller", "_link" };
+        static readonly string[] SpinParts =
+        { "_wheel", "_sprocket", "_idler", "_roller" };
+
+        const int MarksPerTank = 36;
 
         public void Build(TankSpec spec, TankController tank)
         {
             if (built) return;
             built = true;
+            owner = tank;
+            this.spec = spec;
             zones.Clear();
+            wheels.Clear();
 
             var meshes = new List<Transform>();
             foreach (var r in GetComponentsInChildren<Renderer>())
@@ -33,6 +61,8 @@ namespace Samsar
 
             HullRoot = new GameObject("Hull").transform;
             HullRoot.SetParent(transform, false);
+            BodyRoot = new GameObject("Body").transform;
+            BodyRoot.SetParent(HullRoot, false);
             TurretPivot = new GameObject("TurretPivot").transform;
             TurretPivot.SetParent(transform, false);
             GunPivot = new GameObject("GunPivot").transform;
@@ -41,12 +71,15 @@ namespace Samsar
             var turretList = new List<Transform>();
             var gunList = new List<Transform>();
             var hullList = new List<Transform>();
+            var gearList = new List<Transform>();
+            var bodyList = new List<Transform>();
             foreach (var m in meshes)
             {
                 string n = m.name.ToLowerInvariant();
                 if (ContainsAny(n, GunParts)) gunList.Add(m);
                 else if (ContainsAny(n, TurretParts)) turretList.Add(m);
-                else hullList.Add(m);
+                else if (ContainsAny(n, GearParts)) { gearList.Add(m); hullList.Add(m); }
+                else { bodyList.Add(m); hullList.Add(m); }
             }
             if (turretList.Count == 0 && gunList.Count > 0)
             {   // ПТ-САУ без башни: орудие всё равно наводится по вертикали
@@ -57,9 +90,16 @@ namespace Samsar
                 TurretPivot.position = WorldBounds(turretList.Count > 0 ? turretList : meshes).center;
             }
 
-            foreach (var m in hullList) m.SetParent(HullRoot, true);
+            foreach (var m in gearList) m.SetParent(HullRoot, true);   // гусеницы остаются «на земле»
+            foreach (var m in bodyList) m.SetParent(BodyRoot, true);   // корпус качается на подвеске
             foreach (var m in turretList) m.SetParent(TurretPivot, true);
             foreach (var m in gunList) m.SetParent(GunPivot, true);
+
+            foreach (var m in gearList)
+            {
+                string n = m.name.ToLowerInvariant();
+                if (ContainsAny(n, SpinParts)) wheels.Add(new Wheel { t = m, r = WheelRadius(n) });
+            }
 
             // качающаяся часть орудия: точка вращения — казённик
             if (gunList.Count > 0)
@@ -72,6 +112,7 @@ namespace Samsar
                 Bounds tb = WorldBoundsOf(TurretPivot);
                 GunPivot.position = new Vector3(tb.center.x, tb.center.y, tb.max.z - 0.4f);
             }
+            gunRestLocal = GunPivot.localPosition;
 
             // ---- коллайдеры и зоны попадания ----
             Bounds hull = WorldBoundsOf(HullRoot);
@@ -103,6 +144,18 @@ namespace Samsar
             GunTip.SetParent(GunPivot, false);
             GunTip.localPosition = new Vector3(0f, 0f, gb2.extents.z * 1.0f + 0.3f);
 
+            // ---- пыль из-под гусениц ----
+            for (int s = -1; s <= 1; s += 2)
+            {
+                Vector3 p = hull.center + transform.right * (s * (halfW + 0.25f))
+                                           - transform.forward * (hull.extents.z * 0.75f);
+                p.y = hull.min.y + 0.2f;
+                var ps = Fx.MakeDust(p, 0.9f, transform);
+                var em = ps.emission;
+                em.rateOverTime = 0f;
+                dusts.Add(ps);
+            }
+
             // ---- физика ----
             if (GetComponent<Collider>() == null)
             {
@@ -119,9 +172,189 @@ namespace Samsar
             SafeTag(gameObject, "Tank");
         }
 
+        // ---------- анимация ----------
+        /// <summary>Данные движения за кадр: скорость вперёд, руль (−1..1), газ (−1..1).</summary>
+        public void Drive(float forwardSpeed, float steer, float throttle)
+        {
+            driveSpeed = forwardSpeed;
+            driveSteer = steer;
+            driveThrottle = throttle;
+        }
+
+        /// <summary>Откат ствола после выстрела.</summary>
+        public void KickRecoil(float power = 1f)
+        {
+            recoil = Mathf.Clamp01(recoil + power);
+        }
+
+        /// <summary>Сброс визуала (после возрождения).</summary>
+        public void ResetVisuals()
+        {
+            recoil = 0f; pitch = 0f; roll = 0f;
+            if (GunPivot != null) GunPivot.localPosition = gunRestLocal;
+            if (BodyRoot != null) BodyRoot.localRotation = Quaternion.identity;
+        }
+
+        void Update()
+        {
+            if (!built) return;
+            float dt = Time.deltaTime;
+            if (dt <= 0f) return;
+
+            bool dead = owner != null && owner.Dead;
+            float speed = dead ? 0f : driveSpeed;
+            float maxSpeed = spec != null ? Mathf.Max(1f, spec.maxSpeed) : 15f;
+            float rel = Mathf.Clamp(speed / maxSpeed, -1.5f, 1.5f);
+
+            // катки: угловая скорость = v / r, вокруг поперечной оси корпуса
+            if (wheels.Count > 0 && Mathf.Abs(speed) > 0.02f)
+            {
+                for (int i = 0; i < wheels.Count; i++)
+                {
+                    var w = wheels[i];
+                    if (w.t == null) continue;
+                    float deg = Mathf.Rad2Deg * (speed / Mathf.Max(0.05f, w.r)) * dt;
+                    w.t.RotateAround(w.t.position, transform.right, deg);
+                }
+            }
+
+            // подвеска: клюёт носом при торможении, приседает при разгоне, кренится в повороте
+            float targetPitch = dead ? 0f : Mathf.Clamp(-(driveThrottle - rel) * 3.4f, -3.6f, 3.6f);
+            float targetRoll = dead ? 0f : Mathf.Clamp(driveSteer * Mathf.Clamp01(Mathf.Abs(rel)) * 3.2f, -3.6f, 3.6f);
+            pitch = Mathf.Lerp(pitch, targetPitch, dt * 2.2f);
+            roll = Mathf.Lerp(roll, targetRoll, dt * 2.6f);
+            bobPhase += dt * (2f + Mathf.Abs(speed) * 0.9f);
+            float bob = dead ? 0f : Mathf.Sin(bobPhase) * Mathf.Clamp01(Mathf.Abs(rel)) * 0.5f;
+            if (BodyRoot != null) BodyRoot.localRotation = Quaternion.Euler(pitch + bob, 0f, roll);
+
+            // откат ствола: резко назад — плавно вперёд
+            if (recoil > 0f && GunPivot != null)
+            {
+                recoil = Mathf.MoveTowards(recoil, 0f, dt * 1.9f);
+                GunPivot.localPosition = gunRestLocal + Vector3.back * (recoil * recoil * 0.45f);
+            }
+
+            // пыль: чем быстрее — тем плотнее
+            float dustRate = dead ? 0f : Mathf.Clamp01(Mathf.Abs(rel) * 1.6f) * 28f;
+            for (int i = 0; i < dusts.Count; i++)
+            {
+                var ps = dusts[i];
+                if (ps == null) continue;
+                var em = ps.emission;
+                em.rateOverTime = dustRate;
+            }
+
+            // следы гусениц
+            TrackMarks(dt, speed, maxSpeed);
+        }
+
+        // ---------- следы от гусениц ----------
+        void TrackMarks(float dt, float speed, float maxSpeed)
+        {
+            if (marks.Count == 0)
+            {
+                var cam = Camera.main;
+                if (cam == null) return;
+                if ((cam.transform.position - transform.position).sqrMagnitude > 200f * 200f) return;
+                CreateMarkPool();
+            }
+            if (Mathf.Abs(speed) < 2f) return;
+
+            markDist += Mathf.Abs(speed) * dt;
+            if (markDist < 1.1f) return;
+            markDist = 0f;
+
+            float halfW = Mathf.Max(0.6f, spec != null ? spec.width * 0.5f - 0.4f : 1f);
+            for (int s = -1; s <= 1; s += 2)
+            {
+                Vector3 p = transform.position + transform.right * (s * halfW) - transform.up * 0.2f;
+                RaycastHit hit;
+                if (Physics.Raycast(p + Vector3.up * 2f, Vector3.down, out hit, 6f, ~0, QueryTriggerInteraction.Ignore))
+                {
+                    var m = marks[markIndex];
+                    markIndex = (markIndex + 1) % marks.Count;
+                    if (m == null) continue;
+                    m.gameObject.SetActive(true);
+                    m.position = hit.point + hit.normal * 0.03f;
+                    // квад лежит в XZ: кладём его по нормали склона и доводим по курсу машины
+                    m.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal) *
+                                 Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
+                }
+            }
+        }
+
+        void CreateMarkPool()
+        {
+            markParent = new GameObject("~TrackMarks_" + name).transform;
+            markParent.SetParent(null, true);
+            var mat = MarkMaterial();
+            var mesh = QuadMesh();
+            for (int i = 0; i < MarksPerTank; i++)
+            {
+                var q = new GameObject("mark");
+                q.transform.SetParent(markParent, false);
+                var mf = q.AddComponent<MeshFilter>();
+                mf.sharedMesh = mesh;
+                var r = q.AddComponent<MeshRenderer>();
+                r.sharedMaterial = mat;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+                r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+                q.SetActive(false);
+                marks.Add(q.transform);
+            }
+        }
+
+        static Mesh markMesh;
+        /// <summary>Квад лежит в плоскости XZ, нормаль вверх — ориентация по склону однозначна.</summary>
+        static Mesh QuadMesh()
+        {
+            if (markMesh != null) return markMesh;
+            markMesh = new Mesh();
+            markMesh.name = "trackMarkQuad";
+            markMesh.vertices = new[]
+            {
+                new Vector3(-0.28f, 0f, -0.65f), new Vector3(0.28f, 0f, -0.65f),
+                new Vector3(0.28f, 0f, 0.65f), new Vector3(-0.28f, 0f, 0.65f)
+            };
+            markMesh.uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1) };
+            markMesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
+            markMesh.RecalculateNormals();
+            markMesh.RecalculateBounds();
+            return markMesh;
+        }
+
+        static Material markMat;
+        static Material MarkMaterial()
+        {
+            if (markMat != null) return markMat;
+            var sh = Shader.Find("Sprites/Default");
+            if (sh == null) sh = Shader.Find("Unlit/Color");
+            markMat = new Material(sh);
+            markMat.color = new Color(0.07f, 0.06f, 0.05f, 0.32f);
+            markMat.renderQueue = 2900;
+            return markMat;
+        }
+
         public static void SafeTag(GameObject go, string tag)
         {
             try { go.tag = tag; } catch { /* тег не объявлен в проекте — не критично */ }
+        }
+
+        /// <summary>Точка прицеливания в конкретную зону (для ботов: ходовая, МТО, орудие).</summary>
+        public Vector3 ZoneAimPoint(ModuleType type)
+        {
+            for (int i = 0; i < zones.Count; i++)
+                if (zones[i] != null && zones[i].type == type) return zones[i].transform.position;
+            return transform.position + Vector3.up * 1.5f;
+        }
+
+        static float WheelRadius(string n)
+        {
+            if (n.Contains("_roller")) return 0.14f;
+            if (n.Contains("_sprocket")) return 0.36f;
+            if (n.Contains("_idler")) return 0.34f;
+            return 0.42f;   // опорные катки
         }
 
         static bool ContainsAny(string name, string[] keys)

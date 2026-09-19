@@ -73,6 +73,7 @@ namespace Samsar
             Ammo--;
             ReloadLeft = ReloadTime;
             recoilKick = 1f;
+            if (tank.rig != null) tank.rig.KickRecoil(1f);      // ствол уходит назад
             if (tank.IsPlayer) HUD.PunchCrosshair(recoilKick);
             return true;
         }

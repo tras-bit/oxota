@@ -51,21 +51,28 @@ def select_only(objs):
 
 
 def face_unity(root):
-    """Разворачиваем модель: в Blender «вперёд» было +Y, в Unity «вперёд» должно быть +Z."""
+    """Разворачиваем модель: в Blender «вперёд» было +Y, в Unity «вперёд» должно быть +Z.
+
+    Важно: корень сначала ставим в ноль — иначе его поворот/смещение окажется вмороженным
+    в локальные матрицы деталей (и модель уедет в Unity боком)."""
+    root.location = (0.0, 0.0, 0.0)
+    root.rotation_euler = (0.0, 0.0, 0.0)
+    bpy.context.view_layer.update()
     R = mathutils.Matrix.Rotation(math.pi, 4, "Z")
     for ob in children_recursive(root):
         if ob.type == "MESH":
             ob.matrix_world = R @ ob.matrix_world
-    root.rotation_euler = (0.0, 0.0, 0.0)
     bpy.context.view_layer.update()
 
 
 def export_fbx(root_ob, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    select_only(children_recursive(root_ob))
+    select_only(children_recursive(root_ob))   # включает корень: масштаб единиц применяется один раз
+    # bake_space_transform НЕ включаем: с ним экспортёр размазывает масштаб единиц по вложенным
+    # узлам и детали модели схлопываются в точку (проверено сравнением вариантов экспорта).
     kwargs = dict(filepath=path, use_selection=True, object_types={"MESH", "EMPTY"},
                   path_mode="AUTO", embed_textures=False, mesh_smooth_type="FACE",
-                  axis_forward="-Z", axis_up="Y", bake_space_transform=True)
+                  axis_forward="-Z", axis_up="Y", bake_space_transform=False)
     try:
         bpy.ops.export_scene.fbx(**kwargs)
     except TypeError:
@@ -175,10 +182,19 @@ def verify(paths):
             continue
         xs = [p.x for p in pts]; ys = [p.y for p in pts]; zs = [p.z for p in pts]
         tris = sum(len(o.data.polygons) for o in mesh)
+        tiny = 0
+        for ob in mesh:
+            mn = mathutils.Vector((1e9, 1e9, 1e9)); mx = -mn.copy()
+            for v in ob.data.vertices:
+                w = ob.matrix_world @ v.co
+                for i in range(3):
+                    mn[i] = min(mn[i], w[i]); mx[i] = max(mx[i], w[i])
+            if max((mx - mn).x, (mx - mn).y, (mx - mn).z) < 0.2:
+                tiny += 1
         mats = {m.name for o in mesh for m in o.data.materials if m}
-        print("   %-10s %3d объектов, %5d полигонов, габарит %.1f×%.1f×%.1f м, материалов: %d"
+        print("   %-10s %3d объектов, %5d полигонов, габарит %.1f×%.1f×%.1f м, материалов: %d, схлопнутых деталей: %d"
               % (os.path.basename(path), len(mesh), tris,
-                 max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs), len(mats)))
+                 max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs), len(mats), tiny))
 
 
 def build_tanks():
@@ -189,14 +205,13 @@ def build_tanks():
     slots = [(-6.5, 5.5), (6.5, 5.5), (-6.5, -7.0), (6.5, -7.0)]   # 2×2 для рендера
     for i, (key, spec) in enumerate(tank_lib.SPECS.items()):
         r = tank_lib.build_tank(spec)
-        r.location = (slots[i][0], slots[i][1], 0.0)      # смещаем только корень
-        r.rotation_euler.z = math.radians(24)
-        face_unity(r)
+        face_unity(r)                                     # ориентация — при корне в нуле
         roster.append(r)
-        select_only(children_recursive(r))
         fbx = os.path.join(GAME_MODELS, "Tanks", spec.key + ".fbx")
         kb = export_fbx(r, fbx) / 1024
         export_glb(r, os.path.join(GEN_MODELS, spec.key + ".glb"))
+        r.location = (slots[i][0], slots[i][1], 0.0)       # смещение/поворот — только для превью-рендера
+        r.rotation_euler.z = math.radians(24)
         parts = len([o for o in children_recursive(r) if o.type == "MESH"])
         print("   %-14s деталей: %3d, FBX: %6.0f КБ" % (spec.title, parts, kb))
     allmesh = [o for r in roster for o in children_recursive(r) if o.type == "MESH"]

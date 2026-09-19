@@ -172,6 +172,8 @@ namespace Samsar
                 }
             }
             else stuckTimer = 0f;
+
+            if (rig != null) rig.Drive(fwdSpeed, input.Steer, input.Throttle);
         }
 
         void AlignToGround()
@@ -291,6 +293,7 @@ namespace Samsar
             armor.RepairModules();
             gun.RefillAmmo();
             rig.SetBurning(false);
+            rig.ResetVisuals();
             rb.position = position + Vector3.up * 1f;
             rb.velocity = Vector3.zero;
             transform.rotation = Quaternion.Euler(0f, Random.value * 360f, 0f);

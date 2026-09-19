@@ -1,4 +1,4 @@
-// Главное меню и 3D-ангар: вращаем машину, смотрим ТТХ, выбираем сложность и взвод.
+// Ангар: выбор машины, сложности, взвода и старт боя. Интерфейс строится кодом.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -6,272 +6,305 @@ using UnityEngine.UI;
 
 namespace Samsar
 {
+    /// <summary>Меню-ангар: 3D-превью машины, ТТХ, настройки боя, статистика и достижения.</summary>
     public class AngarUI : MonoBehaviour
     {
         public TankLibrary library;
-        public Transform previewPoint;
+        public Transform previewPoint;          // куда ставим модель для показа
         public Camera previewCamera;
+        public Light spot;
 
-        Font font;
         Canvas canvas;
-        GameObject currentModel;
-        Text ttxText, headerText, statsText;
-        Transform listRoot;
-        readonly List<Image> listButtons = new List<Image>();
-        readonly List<Text> listLabels = new List<Text>();
-        Text diffText, squadText, statsText2;
-        GameObject statsPanel;
-        float rotateSpeed = 12f;
+        Font font;
+        Text tankName, tankStats, abilityText, profileText, achievementsText;
+        Text difficultyText, squadText, lastBattleText;
+        RectTransform statsPanel;
+        GameObject previewModel;
+        int tankIndex;
+        float spin;
+        readonly List<Button> tankButtons = new List<Button>();
 
-        void Awake()
+        static readonly Color Panel = new Color(0.07f, 0.08f, 0.07f, 0.86f);
+        static readonly Color Accent = new Color(0.72f, 0.66f, 0.32f, 1f);
+
+        void Start()
         {
-            Profile.Load();
+            Application.targetFrameRate = 60;
             font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             BuildUI();
-            ShowTank(GameSession.TankId);
-            UpdateButtons();
+            SelectTank(0);
+            RefreshProfile();
         }
 
-        void Update()
-        {
-            if (currentModel != null)
-                currentModel.transform.Rotate(Vector3.up, rotateSpeed * Time.deltaTime, Space.World);
-            if (previewCamera != null)
-            {
-                float t = Time.time * 0.08f;
-                Vector3 look = previewPoint != null ? previewPoint.position + Vector3.up * 1.2f : Vector3.zero;
-                previewCamera.transform.position = look + new Vector3(Mathf.Sin(t) * 9f, 4.2f, Mathf.Cos(t) * 9f);
-                previewCamera.transform.LookAt(look);
-            }
-        }
-
-        // ---------- интерфейс ----------
+        // ---------- каркас интерфейса ----------
         void BuildUI()
         {
-            var go = new GameObject("AngarCanvas");
-            go.transform.SetParent(transform, false);
-            canvas = go.AddComponent<Canvas>();
+            var go = new GameObject("AngarCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            canvas = go.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler = go.AddComponent<CanvasScaler>();
+            var scaler = go.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
-            scaler.matchWidthOrHeight = 0.5f;
-            go.AddComponent<GraphicRaycaster>();
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            canvas.sortingOrder = 5;
 
-            var title = MakeText(canvas.transform, "SAMSAR", 52, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -70), new Color(1f, 0.85f, 0.5f));
-            title.fontStyle = FontStyle.Bold;
-            MakeText(canvas.transform, "Стальной охотник — режим «последний выживший»", 20, TextAnchor.MiddleCenter,
-                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -116), new Color(0.85f, 0.88f, 0.9f));
+            // заголовок
+            var title = MakeText(canvas.transform, "SAMSAR — «Стальной охотник»", 46, TextAnchor.MiddleCenter, Accent);
+            Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -46f), new Vector2(900f, 60f));
 
-            // список машин слева
-            var listPanel = MakePanel(canvas.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                                  new Vector2(360, 620), new Vector2(200, 0), new Color(0.06f, 0.07f, 0.09f, 0.85f));
-            listRoot = listPanel.transform;
-            headerText = MakeText(listRoot, "Выбор машины", 22, TextAnchor.MiddleCenter,
-                              new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -34), Color.white);
+            var subtitle = MakeText(canvas.transform,
+                "один режим · последний выживший · 30+ машин · зона сжимается · прокачка I–VII прямо в бою",
+                20, TextAnchor.MiddleCenter, new Color(0.85f, 0.85f, 0.8f));
+            Place(subtitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -86f), new Vector2(1200f, 30f));
 
-            float y = 40f;
-            foreach (var spec in TankSpec.Roster)
+            // левая колонка — список машин
+            var left = MakePanel(canvas.transform, new Vector2(0f, 0.5f), new Vector2(36f, 0f), new Vector2(360f, 460f));
+            var leftTitle = MakeText(left, "МАШИНЫ", 24, TextAnchor.MiddleLeft, Accent);
+            Place(leftTitle.rectTransform, new Vector2(0f, 1f), new Vector2(20f, -18f), new Vector2(280f, 30f));
+            float y = -60f;
+            for (int i = 0; i < TankSpec.Roster.Length; i++)
             {
-                var btn = MakePanel(listRoot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                                new Vector2(320, 84), new Vector2(0, -80 - y), new Color(0.13f, 0.16f, 0.19f, 0.95f));
-                var img = btn.GetComponent<Image>();
-                var button = btn.AddComponent<Button>();
-                button.targetGraphic = img;
-                string id = spec.id;
-                button.onClick.AddListener(() => { GameSession.TankId = id; ShowTank(id); UpdateButtons(); });
-                var label = MakeText(btn.transform, spec.title, 20, TextAnchor.MiddleCenter,
-                                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 14), Color.white);
-                MakeText(btn.transform, ClassName(spec.cls) + " · " + Mathf.RoundToInt(spec.hp) + " HP · " +
-                     Mathf.RoundToInt(spec.SpeedKmh) + " км/ч", 15, TextAnchor.MiddleCenter,
-                     new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -18), new Color(0.75f, 0.8f, 0.85f));
-                listButtons.Add(img);
-                listLabels.Add(label);
-                y += 92f;
+                int idx = i;
+                var b = MakeButton(left, TankSpec.Roster[i].title, new Vector2(0f, 1f),
+                                   new Vector2(16f, y), new Vector2(328f, 62f));
+                b.onClick.AddListener(() => SelectTank(idx));
+                tankButtons.Add(b);
+                y -= 74f;
             }
+            var hint = MakeText(left, "A/D, стрелки или клик — выбор машины\nEnter — в бой", 16,
+                                TextAnchor.UpperLeft, new Color(0.75f, 0.75f, 0.7f));
+            Place(hint.rectTransform, new Vector2(0f, 0f), new Vector2(20f, 16f), new Vector2(320f, 60f));
 
-            // ТТХ справа
-            var ttxPanel = MakePanel(canvas.transform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f),
-                                 new Vector2(420, 560), new Vector2(-230, 30), new Color(0.06f, 0.07f, 0.09f, 0.85f));
-            ttxText = MakeText(ttxPanel.transform, "", 19, TextAnchor.UpperLeft,
-                           new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -30), Color.white);
-            ttxText.alignment = TextAnchor.UpperLeft;
-            ttxText.rectTransform.sizeDelta = new Vector2(380, 480);
+            // правая колонка — настройки боя и статистика
+            var right = MakePanel(canvas.transform, new Vector2(1f, 0.5f), new Vector2(-36f, 0f), new Vector2(400f, 520f));
+            var rightTitle = MakeText(right, "БОЙ", 24, TextAnchor.MiddleLeft, Accent);
+            Place(rightTitle.rectTransform, new Vector2(0f, 1f), new Vector2(20f, -18f), new Vector2(240f, 30f));
 
-            // настройки боя внизу
-            var bottom = MakePanel(canvas.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                               new Vector2(900, 190), new Vector2(0, 110), new Color(0.06f, 0.07f, 0.09f, 0.85f));
-            var diffBtn = MakeButton(bottom.transform, new Vector2(-300, 40), new Vector2(260, 56), "Сложность: обычная",
-                                 CycleDifficulty);
-            diffText = diffBtn.GetComponentInChildren<Text>();
-            var squadBtn = MakeButton(bottom.transform, new Vector2(0, 40), new Vector2(260, 56), "Соло", CycleSquad);
-            squadText = squadBtn.GetComponentInChildren<Text>();
-            MakeButton(bottom.transform, new Vector2(300, 40), new Vector2(260, 56), "Статистика", ToggleStats);
+            difficultyText = MakeText(right, "", 20, TextAnchor.MiddleCenter, Color.white);
+            Place(difficultyText.rectTransform, new Vector2(0f, 1f), new Vector2(20f, -64f), new Vector2(170f, 44f));
+            MakeButton(right, "◀", new Vector2(1f, 1f), new Vector2(-190f, -64f), new Vector2(52f, 44f))
+                .onClick.AddListener(() => ChangeDifficulty(-1));
+            MakeButton(right, "▶", new Vector2(1f, 1f), new Vector2(-20f, -64f), new Vector2(52f, 44f))
+                .onClick.AddListener(() => ChangeDifficulty(1));
 
-            var play = MakeButton(bottom.transform, new Vector2(0, -45), new Vector2(420, 70), "В БОЙ", StartBattle);
-            play.GetComponent<Image>().color = new Color(0.85f, 0.5f, 0.12f, 1f);
-            play.GetComponentInChildren<Text>().fontSize = 28;
+            squadText = MakeText(right, "", 20, TextAnchor.MiddleCenter, Color.white);
+            Place(squadText.rectTransform, new Vector2(0f, 1f), new Vector2(20f, -124f), new Vector2(170f, 44f));
+            MakeButton(right, "сменить", new Vector2(0f, 1f), new Vector2(216f, -124f), new Vector2(130f, 44f))
+                .onClick.AddListener(ToggleSquad);
 
-            statsText = MakeText(canvas.transform, "", 17, TextAnchor.MiddleCenter,
-                             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 26),
-                             new Color(0.7f, 0.75f, 0.8f));
-            RefreshStats();
+            lastBattleText = MakeText(right, "", 17, TextAnchor.UpperLeft, new Color(0.8f, 0.8f, 0.75f));
+            Place(lastBattleText.rectTransform, new Vector2(0f, 1f), new Vector2(20f, -186f), new Vector2(356f, 120f));
+
+            var goBtn = MakeButton(right, "В БОЙ", new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(340f, 74f));
+            goBtn.onClick.AddListener(StartBattle);
+            var goText = goBtn.GetComponentInChildren<Text>();
+            if (goText != null) { goText.fontSize = 30; goText.color = new Color(1f, 0.96f, 0.8f); }
+
+            achievementsText = MakeText(right, "", 16, TextAnchor.LowerLeft, new Color(0.72f, 0.72f, 0.68f));
+            Place(achievementsText.rectTransform, new Vector2(0f, 0f), new Vector2(20f, 110f), new Vector2(356f, 120f));
+
+            // центр — ТТХ выбранной машины
+            statsPanel = MakePanel(canvas.transform, new Vector2(0.5f, 0f), new Vector2(0f, 40f), new Vector2(620f, 190f));
+            tankName = MakeText(statsPanel, "", 30, TextAnchor.UpperCenter, Accent);
+            Place(tankName.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(580f, 40f));
+            tankStats = MakeText(statsPanel, "", 19, TextAnchor.UpperLeft, Color.white);
+            Place(tankStats.rectTransform, new Vector2(0f, 1f), new Vector2(24f, -60f), new Vector2(300f, 120f));
+            abilityText = MakeText(statsPanel, "", 19, TextAnchor.UpperLeft, new Color(0.85f, 0.85f, 0.8f));
+            Place(abilityText.rectTransform, new Vector2(1f, 1f), new Vector2(-24f, -60f), new Vector2(280f, 120f));
+
+            // итоги профиля слева снизу
+            profileText = MakeText(canvas.transform, "", 18, TextAnchor.LowerLeft, new Color(0.8f, 0.8f, 0.75f));
+            Place(profileText.rectTransform, new Vector2(0f, 0f), new Vector2(36f, 20f), new Vector2(420f, 120f));
         }
 
-        void RefreshStats()
+        // ---------- выбор машины ----------
+        void SelectTank(int index)
         {
-            statsText.text = string.Format(
-                "Боёв: {0}   ·   побед: {1}   ·   уничтожено: {2}   ·   урона всего: {3}   ·   лучшее место: {4}   ·   достижений: {5}",
-                Profile.Data.battles, Profile.Data.wins, Profile.Data.kills,
-                Mathf.RoundToInt(Profile.Data.damage),
-                Profile.Data.bestPlace >= 99 ? "—" : Profile.Data.bestPlace.ToString(),
-                Profile.Data.achievements.Count);
-        }
+            if (TankSpec.Roster.Length == 0) return;
+            tankIndex = Mathf.Clamp(index, 0, TankSpec.Roster.Length - 1);
+            var spec = TankSpec.Roster[tankIndex];
+            GameSession.TankId = spec.id;
 
-        static string ClassName(TankClass c)
-        {
-            switch (c)
+            if (tankName != null) tankName.text = spec.title;
+            if (tankStats != null)
+                tankStats.text = string.Format(
+                    "Прочность: {0}\nСкорость: {1:0} км/ч\nОрудие: {2:0} мм / {3:0} урона\nПерезарядка: {4:0.0} с\n"
+                    + "Броня: корпус {5:0} / башня {6:0} мм\nОбзор: {7:0} м · БК: {8} снарядов",
+                    spec.hp, spec.SpeedKmh, spec.penetration, spec.damage, spec.reload,
+                    spec.armorHull, spec.armorTurret, spec.viewRange, spec.shells);
+            if (abilityText != null)
+                abilityText.text = "Умения:\n• авиаудар по области (обязательное)\n• " + AbilityTitle(spec.ability2) +
+                                   "\n\nГабариты: " + spec.width.ToString("0.0") + " × " +
+                                   spec.length.ToString("0.0") + " м, корпус " +
+                                   spec.hullHeight.ToString("0.0") + " м";
+            if (spot != null) spot.color = ParseColor(spec.color);
+
+            ShowModel(spec);
+            for (int i = 0; i < tankButtons.Count; i++)
             {
-                case TankClass.LT: return "лёгкий танк";
-                case TankClass.MT: return "средний танк";
-                case TankClass.HT: return "тяжёлый танк";
-                default: return "ПТ-САУ";
+                var img = tankButtons[i].GetComponent<Image>();
+                if (img != null) img.color = i == tankIndex ? new Color(0.32f, 0.34f, 0.22f, 0.95f)
+                                                            : new Color(0.16f, 0.17f, 0.15f, 0.9f);
             }
+            RefreshProfile();
         }
 
-        GameObject MakePanel(Transform parent, Vector2 aMin, Vector2 aMax, Vector2 size, Vector2 pos, Color color)
+        void ShowModel(TankSpec spec)
         {
-            var go = new GameObject("Panel");
-            go.transform.SetParent(parent, false);
-            var rt = go.AddComponent<RectTransform>();
-            rt.anchorMin = aMin;
-            rt.anchorMax = aMax;
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = size;
-            rt.anchoredPosition = pos;
-            var img = go.AddComponent<Image>();
-            img.color = color;
-            return go;
+            if (previewModel != null) Destroy(previewModel);
+            if (library == null || previewPoint == null) return;
+            var prefab = library.Get(spec.id);
+            if (prefab == null) return;
+            previewModel = Instantiate(prefab, previewPoint.position, Quaternion.identity);
+            previewModel.name = "PreviewModel";
+            foreach (var c in previewModel.GetComponentsInChildren<Collider>()) Destroy(c);
+            foreach (var rb in previewModel.GetComponentsInChildren<Rigidbody>()) Destroy(rb);
+            previewModel.transform.localScale = Vector3.one * 1.15f;
         }
 
-        Text MakeText(Transform parent, string s, int size, TextAnchor anchor, Vector2 aMin, Vector2 aMax,
-                  Vector2 pos, Color color)
+        // ---------- настройки боя ----------
+        void ChangeDifficulty(int dir)
         {
-            var go = new GameObject("Text");
-            go.transform.SetParent(parent, false);
-            var t = go.AddComponent<Text>();
-            t.font = font;
-            t.text = s;
-            t.fontSize = size;
-            t.alignment = anchor;
-            t.color = color;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
-            var rt = t.rectTransform;
-            rt.anchorMin = aMin;
-            rt.anchorMax = aMax;
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = pos;
-            rt.sizeDelta = new Vector2(360, size + 14);
-            return t;
+            int d = (int)GameSession.Difficulty + dir;
+            if (d < 0) d = 2; if (d > 2) d = 0;
+            GameSession.Difficulty = (BotDifficulty)d;
+            RefreshProfile();
         }
 
-        Button MakeButton(Transform parent, Vector2 pos, Vector2 size, string label, UnityEngine.Events.UnityAction action)
-        {
-            var panel = Panel(parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, pos,
-                              new Color(0.14f, 0.17f, 0.2f, 1f));
-            var btn = panel.AddComponent<Button>();
-            btn.targetGraphic = panel.GetComponent<Image>();
-            btn.onClick.AddListener(action);
-            MakeText(panel.transform, label, 19, TextAnchor.MiddleCenter,
-                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Color.white);
-            return btn;
-        }
-
-        // ---------- логика ----------
-        void ShowTank(string id)
-        {
-            var spec = TankSpec.Get(id);
-            if (currentModel != null) Destroy(currentModel);
-            var prefab = library != null ? library.Get(spec.modelName) : null;
-            if (prefab != null && previewPoint != null)
-            {
-                currentModel = Instantiate(prefab, previewPoint.position, Quaternion.Euler(0f, 140f, 0f));
-                currentModel.name = "Preview_" + id;
-                foreach (var c in currentModel.GetComponentsInChildren<Collider>()) Destroy(c);
-            }
-            ttxText.text = string.Format(
-                "  {0}\n\n" +
-                "  Прочность: {1}\n" +
-                "  Максимальная скорость: {2} км/ч\n" +
-                "  Разворот корпуса: {3} °/с\n" +
-                "  Поворот башни: {4} °/с\n\n" +
-                "  Разовый урон: {5}\n" +
-                "  Бронепробиваемость: {6} мм\n" +
-                "  Перезарядка: {7} с\n" +
-                "  Разброс: {8} м на 100 м\n" +
-                "  Сведение: {9} с\n" +
-                "  Боекомплект: {10}\n\n" +
-                "  Обзор: {11} м\n" +
-                "  Броня корпуса/башни: {12}/{13} мм\n\n" +
-                "  Умение 1: Авиаудар\n" +
-                "  Умение 2: {14}",
-                spec.title, Mathf.RoundToInt(spec.hp), Mathf.RoundToInt(spec.SpeedKmh),
-                Mathf.RoundToInt(spec.turnRate), Mathf.RoundToInt(spec.turretTraverse),
-                Mathf.RoundToInt(spec.damage), Mathf.RoundToInt(spec.penetration),
-                spec.reload.ToString("0.0"), spec.dispersion.ToString("0.00"), spec.aimTime.ToString("0.0"),
-                spec.shells, Mathf.RoundToInt(spec.viewRange),
-                Mathf.RoundToInt(spec.armorHull), Mathf.RoundToInt(spec.armorTurret),
-                TankAbilities.Describe(spec.ability2).title);
-        }
-
-        void UpdateButtons()
-        {
-            for (int i = 0; i < listButtons.Count && i < TankSpec.Roster.Length; i++)
-            {
-                bool sel = TankSpec.Roster[i].id == GameSession.TankId;
-                listButtons[i].color = sel ? new Color(0.35f, 0.28f, 0.12f, 0.98f)
-                                           : new Color(0.13f, 0.16f, 0.19f, 0.95f);
-                listLabels[i].color = sel ? new Color(1f, 0.9f, 0.6f) : Color.white;
-            }
-            headerText.text = "Выбор машины (все доступны сразу)";
-        }
-
-        void CycleDifficulty()
-        {
-            GameSession.Difficulty = (BotDifficulty)(((int)GameSession.Difficulty + 1) % 3);
-            diffText.text = "Сложность: " + (GameSession.Difficulty == BotDifficulty.Easy ? "лёгкая"
-                            : GameSession.Difficulty == BotDifficulty.Normal ? "обычная" : "сложная");
-        }
-
-        void CycleSquad()
+        void ToggleSquad()
         {
             GameSession.SquadSize = GameSession.SquadSize == 1 ? 2 : 1;
-            squadText.text = GameSession.SquadSize == 2 ? "Взвод (ИИ-напарник)" : "Соло";
+            RefreshProfile();
         }
 
-        void ToggleStats()
+        void RefreshProfile()
         {
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine("ДОСТИЖЕНИЯ");
-            foreach (var a in AchievementSystem.All())
-                sb.AppendLine("   • " + a);
-            sb.AppendLine();
-            sb.AppendLine("Управление в бою:");
-            sb.AppendLine("   W/S — ход вперёд/назад, A/D — поворот;  мышь — прицел");
-            sb.AppendLine("   ЛКМ — выстрел,  ПКМ — снайперский прицел ×8,  колесо — приближение камеры");
-            sb.AppendLine("   1/Q — авиаудар,  2/E — второе умение,  H — ремонт напарнику");
-            sb.AppendLine("   Tab — состояние боя,  Esc — пауза");
-            MakeText(canvas.transform, sb.ToString(), 18, TextAnchor.UpperLeft,
-                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 0), Color.white);
+            if (difficultyText != null)
+                difficultyText.text = "Сложность: " + DifficultyTitle(GameSession.Difficulty);
+            if (squadText != null)
+                squadText.text = GameSession.SquadSize >= 2 ? "Взвод: 2 (с ИИ-напарником)" : "Одиночный";
+            Profile.Load();
+            var p = Profile.Data;
+            if (profileText != null)
+                profileText.text = string.Format("Боёв: {0} · побед: {1}\nфраги: {2} · урон: {3}\nлучший результат: {4} место\nнаграды: {5}",
+                    p.battles, p.wins, p.kills, Mathf.RoundToInt(p.damage), p.bestPlace, p.achievements.Count);
+            if (lastBattleText != null)
+                lastBattleText.text = p.battles > 0
+                    ? string.Format("Последний бой:\nместо {0}, фраги {1}, урон {2}\nуровень {3}, добыча {4}",
+                                    p.lastPlace, p.lastKills, Mathf.RoundToInt(p.lastDamage), p.lastLevel, p.lastLoot)
+                    : "Боёв пока не было.\nПервый бой — самый важный.";
+            if (achievementsText != null)
+            {
+                var sb = new System.Text.StringBuilder("НАГРАДЫ\n");
+                foreach (var a in AchievementSystem.All)
+                    sb.Append(Profile.Has(a.id) ? "★ " : "☆ ").Append(a.title).Append(" — ")
+                      .Append(a.desc).Append('\n');
+                achievementsText.text = sb.ToString();
+            }
         }
 
         void StartBattle()
         {
-            GameSession.Reset();
+            GameSession.TankId = TankSpec.Roster[tankIndex].id;
             SceneManager.LoadScene("Battle");
+        }
+
+        static string DifficultyTitle(BotDifficulty d)
+        {
+            switch (d)
+            {
+                case BotDifficulty.Easy: return "новичок";
+                case BotDifficulty.Hard: return "ас";
+                default: return "обычная";
+            }
+        }
+
+        static string AbilityTitle(string id)
+        {
+            switch (id)
+            {
+                case "smoke": return "дымовая завеса";
+                case "repair": return "полевой ремонт";
+                case "fire_ring": return "огненное кольцо";
+                case "camouflage": return "маскировка";
+                case "boost": return "форсаж";
+                default: return id;
+            }
+        }
+
+        static Color ParseColor(string hex)
+        {
+            Color c;
+            if (ColorUtility.TryParseHtmlString(hex, out c)) return c;
+            return new Color(0.4f, 0.4f, 0.35f);
+        }
+
+        // ---------- вращение превью ----------
+        void Update()
+        {
+            if (previewModel != null)
+            {
+                spin += Time.deltaTime * 14f;
+                previewModel.transform.rotation = Quaternion.Euler(0f, spin, 0f);
+            }
+            if (previewCamera != null && previewPoint != null)
+            {
+                float t = Time.time * 0.16f;
+                previewCamera.transform.position = previewPoint.position +
+                    new Vector3(Mathf.Sin(t) * 9f, 3.4f, Mathf.Cos(t) * 9f);
+                previewCamera.transform.LookAt(previewPoint.position + Vector3.up * 0.9f);
+            }
+            // горячие клавиши
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) StartBattle();
+            if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) SelectTank(tankIndex + 1);
+            if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) SelectTank(tankIndex - 1);
+        }
+
+        // ---------- строительные мелочи ----------
+        RectTransform MakePanel(Transform parent, Vector2 anchor, Vector2 offset, Vector2 size)
+        {
+            var go = new GameObject("Panel", typeof(Image));
+            go.transform.SetParent(parent, false);
+            var img = go.GetComponent<Image>();
+            img.color = Panel;
+            var rt = go.GetComponent<RectTransform>();
+            Place(rt, anchor, offset, size);
+            return rt;
+        }
+
+        Text MakeText(Transform parent, string text, int size, TextAnchor anchor, Color color)
+        {
+            var go = new GameObject("Text", typeof(Text));
+            go.transform.SetParent(parent, false);
+            var t = go.GetComponent<Text>();
+            t.font = font;
+            t.fontSize = size;
+            t.text = text;
+            t.alignment = anchor;
+            t.color = color;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.verticalOverflow = VerticalWrapMode.Overflow;
+            return t;
+        }
+
+        Button MakeButton(Transform parent, string label, Vector2 anchor, Vector2 offset, Vector2 size)
+        {
+            var go = new GameObject("Button", typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+            var img = go.GetComponent<Image>();
+            img.color = new Color(0.16f, 0.17f, 0.15f, 0.9f);
+            Place(go.GetComponent<RectTransform>(), anchor, offset, size);
+            var t = MakeText(go.transform, label, 20, TextAnchor.MiddleCenter, Color.white);
+            Place(t.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, size);
+            return go.GetComponent<Button>();
+        }
+
+        static void Place(RectTransform rt, Vector2 anchor, Vector2 offset, Vector2 size)
+        {
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.pivot = anchor;
+            rt.anchoredPosition = offset;
+            rt.sizeDelta = size;
         }
     }
 }

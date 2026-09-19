@@ -90,17 +90,22 @@ namespace Samsar
 
         static void Save() { Profile.Save(); }
 
-        public static string[] All()
+        /// <summary>Список наград для интерфейса ангара.</summary>
+        public class Achievement
         {
-            return new[]
-            {
-                "Первая кровь — уничтожить противника",
-                "Последний охотник — победить в бою",
-                "Собиратель добычи — 20 единиц лута за бой",
-                "Ветеран — 5000 урона за бой",
-                "Взвод до конца — победить вместе с напарником",
-                "Прокачанная машина — 5 модулей за бой",
-            };
+            public string id, title, desc;
+            public Achievement(string id, string title, string desc)
+            { this.id = id; this.title = title; this.desc = desc; }
         }
+
+        public static readonly Achievement[] All =
+        {
+            new Achievement(FirstBlood,   "Первая кровь",       "уничтожить противника"),
+            new Achievement(Survivor,     "Последний охотник",  "победить в бою"),
+            new Achievement(LootMaster,   "Собиратель добычи",  "20 единиц лута за бой"),
+            new Achievement(Veteran,      "Ветеран",            "5000 урона за бой"),
+            new Achievement(SquadHero,    "Взвод до конца",     "победить вместе с напарником"),
+            new Achievement(AirStrikeAce, "Прокачанная машина", "5 модулей за бой"),
+        };
     }
 }

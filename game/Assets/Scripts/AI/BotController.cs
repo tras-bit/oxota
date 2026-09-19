@@ -254,11 +254,13 @@ namespace Samsar
             {
                 // точка прицеливания: корпус / гусеницы / МТО (сложные боты целятся в уязвимые зоны)
                 Vector3 aimBase = target.transform.position + Vector3.up * 1.6f;
-                if (Random.value < d.weakspotChance)
+                if (Random.value < d.weakspotChance && target.rig != null)
                 {
                     float r = Random.value;
-                    if (r < 0.4f) aimBase = target.transform.position + Vector3.up * 0.7f;                    // ходовая
-                    else if (r < 0.7f) aimBase = target.transform.position - target.transform.forward * 3f + Vector3.up * 1.2f; // МТО
+                    if (r < 0.35f) aimBase = target.rig.ZoneAimPoint(ModuleType.Tracks);       // сбить ходовую
+                    else if (r < 0.65f) aimBase = target.rig.ZoneAimPoint(ModuleType.Engine);  // зажечь МТО
+                    else if (r < 0.85f) aimBase = target.rig.ZoneAimPoint(ModuleType.Gun);     // разбить орудие
+                    else aimBase = target.rig.ZoneAimPoint(ModuleType.Ammo);                   // детонация БК
                 }
                 if (d.leadTarget && target.input != null)
                 {

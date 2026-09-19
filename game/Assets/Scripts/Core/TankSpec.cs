@@ -29,6 +29,9 @@ namespace Samsar
         public float dispersion = 0.4f;         // м на 100 м
         public float aimTime = 2.2f;            // с сведения
 
+        public float width = 3.2f;              // ширина по гусеницам, м (как в модели)
+        public float length = 6.6f;             // длина корпуса, м (как в модели)
+        public float hullHeight = 1.05f;        // высота корпуса, м
         public float viewRange = 350f;          // м, обнаружение
         public float armorHull = 70f;           // мм
         public float armorTurret = 90f;
@@ -48,6 +51,7 @@ namespace Samsar
                 turretTraverse = 46f, reload = 3.6f, damage = 150f, penetration = 130f,
                 shellSpeed = 240f, dispersion = 0.38f, aimTime = 1.7f, viewRange = 380f,
                 armorHull = 45f, armorTurret = 60f, armorRear = 30f, shells = 28,
+                width = 2.9f, length = 5.6f, hullHeight = 0.95f,
                 ability2 = "smoke", color = "#6d7b3f"
             },
             new TankSpec {
@@ -56,6 +60,7 @@ namespace Samsar
                 turretTraverse = 38f, reload = 5.2f, damage = 220f, penetration = 165f,
                 shellSpeed = 220f, dispersion = 0.35f, aimTime = 2.2f, viewRange = 350f,
                 armorHull = 80f, armorTurret = 110f, armorRear = 45f, shells = 24,
+                width = 3.2f, length = 6.6f, hullHeight = 1.05f,
                 ability2 = "repair", color = "#8b7c4a"
             },
             new TankSpec {
@@ -64,6 +69,7 @@ namespace Samsar
                 turretTraverse = 28f, reload = 8.4f, damage = 340f, penetration = 210f,
                 shellSpeed = 190f, dispersion = 0.42f, aimTime = 3.0f, viewRange = 330f,
                 armorHull = 130f, armorTurret = 160f, armorRear = 60f, shells = 18,
+                width = 3.9f, length = 7.4f, hullHeight = 1.20f,
                 ability2 = "fire_ring", color = "#5b6675"
             },
             new TankSpec {
@@ -72,6 +78,7 @@ namespace Samsar
                 turretTraverse = 16f, reload = 11.5f, damage = 500f, penetration = 265f,
                 shellSpeed = 260f, dispersion = 0.28f, aimTime = 3.4f, viewRange = 360f,
                 armorHull = 100f, armorTurret = 120f, armorRear = 40f, shells = 14,
+                width = 3.3f, length = 7.0f, hullHeight = 1.15f,
                 ability2 = "camouflage", color = "#4d5a38"
             },
         };
