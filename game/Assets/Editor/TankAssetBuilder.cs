@@ -68,8 +68,6 @@ namespace Samsar.EditorTools
                 var m = LoadTex(camo + "_mask.png");
                 MakeMaterial("MAT_" + camo, a, n, m, 1f, Color.white);
             }
-            MakeMaterial("MAT_SteelOlive", LoadTex("steel_olive_albedo.jpg"), LoadTex("steel_olive_normal.png"),
-                         LoadTex("steel_olive_mask.png"), 1f, Color.white);
         }
 
         static Texture2D LoadTex(string name)
@@ -150,32 +148,50 @@ namespace Samsar.EditorTools
             }
         }
 
+        // camo-материалы создаются как MAT_<текстура>, напр. MAT_steel_olive
+        static Material Mat(string name)
+        {
+            return AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/" + name + ".mat");
+        }
+
+        static string TankCamo(GameObject root)
+        {
+            string id = root.name.ToLowerInvariant();
+            if (id.Contains("lt")) return "steel_olive";
+            if (id.Contains("mt")) return "steel_sand";
+            if (id.Contains("ht")) return "steel_grey";
+            if (id.Contains("td")) return "steel_green";
+            return "steel_olive";
+        }
+
+        /// <summary>Подбирает наш материал по имени материала из FBX (регистр не важен).</summary>
+        static Material MapMaterial(string fbxName, string camo)
+        {
+            string n = (fbxName ?? "").ToLowerInvariant();
+            if (n.Contains("rubber")) return Mat("MAT_Rubber");
+            if (n.Contains("optic")) return Mat("MAT_Optics");
+            if (n.Contains("rust")) return Mat("MAT_Rusty");
+            if (n.Contains("concrete")) return Mat("MAT_Concrete");
+            if (n.Contains("wood")) return Mat("MAT_Wood");
+            // важно: проверку стали держим раньше листвы — у ПТ камо-текстура называется steel_green
+            if (n.Contains("steel") || n.Contains("armor"))
+            {
+                var piece = Mat("MAT_" + camo);
+                if (piece != null) return piece;
+            }
+            if (n.Contains("leaf") || n.Contains("tree")) return Mat("MAT_Leaf");
+            return null;
+        }
+
         static void AssignMaterials(GameObject root)
         {
-            var camoMap = new Dictionary<string, string>
-            {
-                { "lt", "steel_olive" }, { "mt", "steel_sand" },
-                { "ht", "steel_grey" }, { "td", "steel_green" },
-            };
-            string camo = "steel_olive";
-            foreach (var kv in camoMap)
-                if (root.name.Contains(kv.Key)) camo = kv.Value;
-
+            string camo = TankCamo(root);
             foreach (var r in root.GetComponentsInChildren<Renderer>())
             {
                 var list = new List<Material>();
                 foreach (var m in r.sharedMaterials)
                 {
-                    string n = m != null ? m.name : "";
-                    Material repl = null;
-                    if (n.Contains("Rubber")) repl = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_Rubber.mat");
-                    else if (n.Contains("Optics")) repl = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_Optics.mat");
-                    else if (n.Contains("Rusty")) repl = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_Rusty.mat");
-                    else if (n.Contains("Concrete")) repl = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_Concrete.mat");
-                    else if (n.Contains("Wood")) repl = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_Wood.mat");
-                    else if (n.Contains("Leaf")) repl = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_Leaf.mat");
-                    else if (n.Contains("Armor") || n.Contains("steel"))
-                        repl = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_" + camo + ".mat");
+                    var repl = MapMaterial(m != null ? m.name : "", camo);
                     list.Add(repl != null ? repl : m);
                 }
                 r.sharedMaterials = list.ToArray();
@@ -217,27 +233,12 @@ namespace Samsar.EditorTools
 
         static void AssignPropMaterials(GameObject root, string kind)
         {
-            Material concrete = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_Concrete.mat");
-            Material wood = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_Wood.mat");
-            Material metal = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_Rusty.mat");
-            Material steel = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_steel_olive.mat");
-            Material glass = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_Optics.mat");
-            Material leaf = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/MAT_Leaf.mat");
-
             foreach (var r in root.GetComponentsInChildren<Renderer>())
             {
                 var list = new List<Material>();
                 foreach (var m in r.sharedMaterials)
                 {
-                    string n = m != null ? m.name : "";
-                    Material repl = null;
-                    if (n.Contains("Rubber")) repl = metal;
-                    else if (n.Contains("Optics")) repl = glass;
-                    else if (n.Contains("Rusty")) repl = metal;
-                    else if (n.Contains("Concrete")) repl = concrete;
-                    else if (n.Contains("Wood")) repl = wood;
-                    else if (n.Contains("Leaf")) repl = leaf;
-                    else if (n.Contains("SteelOlive") || n.Contains("steel")) repl = steel;
+                    var repl = MapMaterial(m != null ? m.name : "", "steel_olive");
                     list.Add(repl != null ? repl : m);
                 }
                 r.sharedMaterials = list.ToArray();
