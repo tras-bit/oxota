@@ -5,6 +5,18 @@ __pycache__/
 node_modules/
 .DS_Store
 
-# Blender: промежуточные файлы и сцены (пересобираются скриптом tools/build_tanks.py)
+# Blender: промежуточные файлы и сцены (модели пересобираются: tools/blender.sh tools/build_models.py all)
 *.blend
 *.blend1
+
+# Blender: промежуточные GLB-превью моделей (пересобираются той же командой)
+assets/generated/models/
+
+# Unity: служебные папки
+game/*/[Ll]ibrary/
+game/*/[Tt]emp/
+game/*/[Oo]bj/
+game/*/[Bb]uild/
+game/*/[Bb]uilds/
+game/*/[Ll]ogs/
+game/*/[Uu]serSettings/

@@ -16,6 +16,7 @@ import os
 import subprocess
 import sys
 import collections
+import re
 
 HOME = os.path.expanduser("~")
 VENV = os.path.join(HOME, ".local", "bpy-venv")
@@ -117,28 +118,44 @@ def main():
     if r.returncode != 0:
         sys.exit("gcc: " + r.stderr)
 
-    # имена заглушённых библиотек (DT_NEEDED, которых нет в системе)
-    real = {}
-    for l in sys_so:
-        real.setdefault(os.path.basename(l), l)
-    missing_libs = set()
-    for p in bpy_so:
-        r = subprocess.run(["readelf", "-d", p], capture_output=True, text=True)
-        for line in r.stdout.splitlines():
-            if "NEEDED" in line and "[" in line:
-                name = line.split("[")[1].split("]")[0]
-                if name not in real and ("GL" in name or "X" in name[:3] or name.startswith("libSM")
-                                         or name.startswith("libICE") or "xkbcommon" in name):
-                    missing_libs.add(name)
-
-    for name in sorted(missing_libs):
+    # Симлинки под имена недостающих библиотек + самопроверка импортом bpy:
+    # если каких-то .so всё ещё нет, линкуем их и повторяем (до 25 итераций).
+    guard = {"libc.so.6", "libm.so.6", "libdl.so.2", "libpthread.so.0", "librt.so.1",
+             "libgcc_s.so.1", "libstdc++.so.6", "ld-linux-x86-64.so.2", "libz.so.1"}
+    linked = []
+    for attempt in range(25):
+        env = dict(os.environ)
+        env["LD_LIBRARY_PATH"] = OUT + ":" + os.path.join(VENV, "lib", "python3.11",
+                                                          "site-packages", "bpy", "lib")
+        r = subprocess.run([os.path.join(VENV, "bin", "python"), "-c", "import bpy"],
+                           capture_output=True, text=True, env=env)
+        if r.returncode == 0:
+            print("Проверка импорта bpy: OK (итераций: %d)" % attempt)
+            break
+        err = r.stderr
+        name = None
+        if "cannot open shared object file" in err:
+            m = re.search(r"([\w\.\+\-]+\.so[\w\.]*): cannot open shared object file", err)
+            if m:
+                name = m.group(1)
+        elif "undefined symbol:" in err:
+            sym = err.split("undefined symbol:")[1].split()[0]
+            print("!! незакрытый символ:", sym)
+            break
+        if not name:
+            print("Импорт падает по другой причине:\n", err[-1500:])
+            break
+        if name in guard:
+            print("!! не хватает системной библиотеки:", name)
+            break
         link = os.path.join(OUT, name)
         if os.path.lexists(link):
             os.remove(link)
         os.symlink("libstubs.so", link)
+        linked.append(name)
         print("shim:", name, "-> libstubs.so")
     json.dump(sorted(needed), open(os.path.join(OUT, "symbols.json"), "w"), indent=0)
-    print("Заглушено символов: %d, библиотек: %d" % (len(needed), len(missing_libs)))
+    print("Заглушено символов: %d, библиотек-заглушек: %d" % (len(needed), len(linked)))
 
 
 if __name__ == "__main__":

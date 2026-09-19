@@ -18,7 +18,7 @@ if [ ! -x "${VENV}/bin/python" ]; then
   python3 -m venv "$VENV"
 fi
 "${VENV}/bin/pip" install --quiet --upgrade pip wheel
-"${VENV}/bin/pip" install --no-cache-dir "bpy==${BPY_VERSION}"
+"${VENV}/bin/pip" install --no-cache-dir "bpy==${BPY_VERSION}" pillow   # pillow — для процедурных текстур
 
 echo "== 2/3. Заглушки для отсутствующих системных библиотек"
 python3 "${ROOT}/tools/make_gl_stubs.py"
@@ -31,6 +31,9 @@ print("Blender:", bpy.app.version_string)
 os.makedirs("/tmp/blender_check", exist_ok=True)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.mesh.primitive_cube_add(size=1)
+bpy.ops.object.camera_add(location=(3, -3, 2), rotation=(1.1, 0, 0.78))
+bpy.context.scene.camera = bpy.context.object
+bpy.ops.object.light_add(type="SUN", location=(3, -3, 5))
 sc = bpy.context.scene
 sc.render.engine = "CYCLES"
 sc.cycles.device = "CPU"
