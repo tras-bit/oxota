@@ -14,6 +14,14 @@ namespace Samsar
         public float life = 900f;
         float bobPhase;
 
+        /// <summary>Все ящики на карте. Реестр вместо FindObjectsOfType: боты сканируют добычу
+        /// каждые 2,5 с, и при 29 ботах полный обход сцены десятью машинами в секунду
+        /// стал бы заметным рывком кадра.</summary>
+        public static readonly List<LootBox> All = new List<LootBox>();
+
+        void OnEnable() { All.Add(this); }
+        void OnDisable() { All.Remove(this); }
+
         public static LootBox Spawn(Vector3 pos, LootKind kind, float amount, bool airDrop)
         {
             var go = GameObject.CreatePrimitive(airDrop ? PrimitiveType.Cube : PrimitiveType.Cube);

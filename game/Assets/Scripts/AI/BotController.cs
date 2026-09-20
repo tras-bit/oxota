@@ -203,7 +203,7 @@ namespace Samsar
         {
             LootBox best = null;
             float bestScore = float.MaxValue;
-            var boxes = Object.FindObjectsOfType<LootBox>();
+            var boxes = LootBox.All;
             foreach (var b in boxes)
             {
                 if (b.isAirDrop && Random.value > 0.5f) { /* за грузом идут не все */ }
