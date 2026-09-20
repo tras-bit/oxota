@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Samsar
 {
     /// <summary>Сложность ботов (в меню: 3 уровня).</summary>
-    public enum BotDifficulty { Easy = 0, Normal = 1, Hard = 2 }
+    public enum BotDifficulty { Easy = 0, Normal = 1, Hard = 2, Marauder = 3 }
 
     /// <summary>Что выбрал игрок в ангаре; передаётся в боевую сцену между загрузками.</summary>
     public static class GameSession
@@ -13,7 +13,10 @@ namespace Samsar
         public static BotDifficulty Difficulty = BotDifficulty.Normal;
         public static int SquadSize = 1;          // 1 = соло, 2 = взвод с ИИ-напарником
         public static bool SquadMateIsBot = true;
-        public static int BotsInBattle = 12;      // 5..10 чистых мародёров + бойцы остальных классов
+        public static int BotsInBattle = 12;      // всего противников
+        // Из них «Мародёры» — отдельный тип: слабее стреляют, сначала идут за добычей,
+        // подранками отступают, зато с них падает больше трофеев (по духу режима).
+        public static int MaraudersInBattle = 6;
         public static string PlayerName = "Охотник";
 
         // Результаты боя (заполняется в бою, показывается после)
@@ -51,6 +54,7 @@ namespace Samsar
         /// <summary>Опыт за действия в бою.</summary>
         public static float XpDamage => 0.35f;      // за единицу урона
         public static float XpKill => 120f;         // за уничтоженную машину
+        public static float XpKillMarauderMul => 0.6f;   // мародёр слабее — и опыта с него меньше
         public static float XpLoot => 45f;          // за подобранную добычу
         public static float XpAirDrop => 160f;      // за воздушный груз
     }

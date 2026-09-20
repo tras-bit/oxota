@@ -72,18 +72,24 @@ namespace Samsar
                 mate.vision.rangeMult = 1.1f;
             }
 
-            // противники: боты разной сложности (мародёры + охотники)
+            // противники: сначала «Мародёры» (слабые, идут за добычей), потом охотники-бойцы
             int total = Mathf.Clamp(GameSession.BotsInBattle, 4, Rules.MaxCombatants - 2);
+            int marauders = Mathf.Clamp(GameSession.MaraudersInBattle, 0, total);
             for (int i = 0; i < total; i++)
             {
+                bool isMarauder = i < marauders;
                 var pos = pts[idx++ % pts.Length].position + Random.insideUnitSphere * 8f;
                 pos.y = 2f;
-                var bot = SpawnTank(RandomTankId(), false, false, "Мародёр-" + (i + 1), pos);
+                var bot = SpawnTank(RandomTankId(), false, false,
+                                    (isMarauder ? "Мародёр-" : "Охотник-") + (i + 1), pos);
+                if (isMarauder && bot.abilities != null)
+                    bot.abilities.AddCharge(1);   // мародёр уже успел награбить заряд умения
                 var ai = bot.gameObject.AddComponent<BotController>();
-                ai.Init(bot, DifficultyFor(i));
-                if (i % 4 == 0) bot.vision.rangeMult = 1.15f;   // «главари» видят дальше
+                ai.Init(bot, isMarauder ? BotDifficulty.Marauder : DifficultyFor(i - marauders));
+                if (!isMarauder && i % 4 == 0) bot.vision.rangeMult = 1.15f;   // «главари» видят дальше
             }
-            HUD.Toast(string.Format("Бой начался: {0} машин, зона сужается", TankRegistry.All.Count), HUD.ToastKind.Info);
+            HUD.Toast(string.Format("Бой начался: {0} машин ({1} мародёров), зона сужается",
+                                    TankRegistry.All.Count, marauders), HUD.ToastKind.Info);
         }
 
         BotDifficulty DifficultyFor(int i)
@@ -114,7 +120,8 @@ namespace Samsar
             return list.ToArray();
         }
 
-        public TankController SpawnTank(string specId, bool isPlayer, bool isAlly, string callsign, Vector3 pos)
+        public TankController SpawnTank(string specId, bool isPlayer, bool isAlly, string callsign, Vector3 pos,
+                                        bool isMarauder = false)
         {
             var spec = TankSpec.Get(specId);
             var model = library != null ? library.Get(spec.id) : null;
@@ -146,6 +153,7 @@ namespace Samsar
             var tank = go.GetComponent<TankController>();
             if (tank == null) tank = go.AddComponent<TankController>();
             tank.Configure(spec, isPlayer, isAlly, callsign);
+            tank.IsMarauder = isMarauder;
             TankRegistry.All.Add(tank);
             tank.Died += OnTankDied;
             return tank;

@@ -20,6 +20,7 @@ namespace Samsar
         public TankSpec spec;
         public bool IsPlayer;
         public bool IsAlly;                  // напарник по взводу (ИИ-союзник)
+        public bool IsMarauder;              // «Мародёр»: слабее, но с него больше трофеев
         public string Callsign = "Боец";
         public float bonusSpeed = 1f;
 
@@ -275,11 +276,11 @@ namespace Samsar
             if (killer != null && killer != this)
             {
                 killer.Kills++;
-                killer.AddXp(Rules.XpKill);
+                killer.AddXp(Rules.XpKill * (IsMarauder ? Rules.XpKillMarauderMul : 1f));
                 if (killer.IsPlayer) HUD.Toast("Уничтожен: " + Callsign, HUD.ToastKind.Good);
             }
             if (BattleManager.Instance != null && BattleManager.Instance.loot != null)
-                BattleManager.Instance.loot.SpawnTrophy(transform.position);
+                BattleManager.Instance.loot.SpawnTrophy(transform.position, IsMarauder);
             if (IsPlayer) HUD.Toast("Ваша машина уничтожена", HUD.ToastKind.Bad);
         }
 

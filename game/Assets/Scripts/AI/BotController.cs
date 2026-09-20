@@ -29,6 +29,7 @@ namespace Samsar
         {
             public float reaction, aimErrorDeg, engageRange, accuracy, weakspotChance;
             public bool useAbilities, leadTarget, groupTactics;
+            public bool lootHunter, coward;      // мародёр: идёт за добычей и отступает подранком
         }
 
         public void Init(TankController t, BotDifficulty difficulty)
@@ -60,6 +61,11 @@ namespace Samsar
                 case BotDifficulty.Easy:
                     return new TankDifficulty { reaction = 1.5f, aimErrorDeg = 3.4f, engageRange = 250f, accuracy = 0.55f,
                                                 weakspotChance = 0.05f, useAbilities = false, leadTarget = false, groupTactics = false };
+                case BotDifficulty.Marauder:
+                    // Мародёр: воюет неохотно, зато первым хватает добычу и убегает подранком
+                    return new TankDifficulty { reaction = 1.9f, aimErrorDeg = 4.2f, engageRange = 210f, accuracy = 0.45f,
+                                                weakspotChance = 0f, useAbilities = false, leadTarget = false,
+                                                groupTactics = false, lootHunter = true, coward = true };
                 case BotDifficulty.Hard:
                     return new TankDifficulty { reaction = 0.45f, aimErrorDeg = 0.75f, engageRange = 360f, accuracy = 0.9f,
                                                 weakspotChance = 0.55f, useAbilities = true, leadTarget = true, groupTactics = true };
@@ -103,6 +109,28 @@ namespace Samsar
 
             // 2) выбор цели
             target = PickTarget();
+
+            // мародёр-подранок не воюет, а уходит в сторону от противника
+            if (d.coward && target != null && tank.armor.HullHp < tank.armor.HullMax * 0.32f)
+            {
+                state = "отход";
+                Vector3 away = (tank.transform.position - target.transform.position).normalized;
+                SetDestination(tank.transform.position + away * 150f);
+                return;
+            }
+
+            // мародёр гонится за добычей даже сквозь бой, если рядом никого нет
+            if (d.lootHunter && (target == null ||
+                Vector3.Distance(transform.position, target.transform.position) > 120f))
+            {
+                var marauderLoot = FindLoot(700f);
+                if (marauderLoot != null)
+                {
+                    state = "сбор добычи";
+                    SetDestination(marauderLoot.transform.position);
+                    return;
+                }
+            }
 
             if (target != null)
             {
@@ -171,7 +199,7 @@ namespace Samsar
             }
         }
 
-        LootBox FindLoot()
+        LootBox FindLoot(float maxDist = 500f)
         {
             LootBox best = null;
             float bestScore = float.MaxValue;
@@ -180,7 +208,7 @@ namespace Samsar
             {
                 if (b.isAirDrop && Random.value > 0.5f) { /* за грузом идут не все */ }
                 float dist = Vector3.Distance(transform.position, b.transform.position);
-                if (dist > 500f) continue;
+                if (dist > maxDist) continue;
                 float score = dist - (b.isAirDrop ? 350f : 0f) - (b.kind == LootKind.Repair && tank.armor.HullHp < tank.armor.HullMax * 0.5f ? 200f : 0f)
                               - (b.kind == LootKind.Shells && tank.gun.Ammo < 5 ? 250f : 0f);
                 if (score < bestScore) { bestScore = score; best = b; }

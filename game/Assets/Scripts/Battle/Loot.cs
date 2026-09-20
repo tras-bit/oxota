@@ -154,17 +154,19 @@ namespace Samsar
         }
 
         /// <summary>Трофеи с уничтоженной машины (собираются автоматически рядом).</summary>
-        public void SpawnTrophy(Vector3 pos)
+        /// <summary>Трофеи с убитой машины. С «Мародёров» падает больше: заряд умения почти всегда,
+        /// жетон «Возрождения» — заметно чаще (они и есть источник трофеев в режиме).</summary>
+        public void SpawnTrophy(Vector3 pos, bool rich = false)
         {
             LootKind kind = (LootKind)Random.Range(0, 4);
             float amount = kind == LootKind.Shells ? Random.Range(3, 8)
                          : kind == LootKind.Xp ? Random.Range(60, 140)
                          : kind == LootKind.Repair ? Random.Range(80, 180) : 1;
             LootBox.Spawn(pos + Vector3.up * 0.6f, kind, amount, false);
-            if (Random.value > 0.75f)
+            if (Random.value > (rich ? 0.25f : 0.75f))
                 LootBox.Spawn(pos + new Vector3(Random.Range(-3f, 3f), 0.6f, Random.Range(-3f, 3f)),
                               LootKind.AbilityCharge, 1f, false);
-            if (Random.value > 0.9f)
+            if (Random.value > (rich ? 0.7f : 0.9f))
                 LootBox.Spawn(pos + new Vector3(Random.Range(-4f, 4f), 0.6f, Random.Range(-4f, 4f)),
                               LootKind.Respawn, 1f, false);
         }
