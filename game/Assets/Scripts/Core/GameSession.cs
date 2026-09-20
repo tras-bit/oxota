@@ -26,12 +26,13 @@ namespace Samsar
         public static float LastDamage;
         public static float LastSurvived;
         public static int LastLoot;
+        public static int LastLevel = 1;
         public static bool LastVictory;
 
         public static void Reset()
         {
             LastPlace = 0; LastKills = 0; LastDamage = 0f;
-            LastSurvived = 0f; LastLoot = 0; LastVictory = false;
+            LastSurvived = 0f; LastLoot = 0; LastLevel = 1; LastVictory = false;
         }
     }
 

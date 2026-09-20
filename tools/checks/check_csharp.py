@@ -13,6 +13,7 @@
 """
 import glob
 import os
+import re
 import sys
 from collections import defaultdict
 
@@ -235,6 +236,21 @@ def collect_extensions(src, node, out):
         collect_extensions(src, child, out)
 
 
+def collect_nested_types(src, node, out, container=None):
+    """Вложенные типы: имя -> имя контейнера. Из чужого файла ToastKind нужно писать HUD.ToastKind."""
+    for child in node.children:
+        if child.type in ("class_declaration", "struct_declaration",
+                          "enum_declaration", "interface_declaration"):
+            nm_node = child.child_by_field_name("name")
+            nm = text(src, nm_node) if nm_node is not None else None
+            if nm and container is not None and nm not in out:
+                out[nm] = container
+            if nm:
+                collect_nested_types(src, child, out, nm)
+        else:
+            collect_nested_types(src, child, out, container)
+
+
 def run():
     files = []
     for d in SRC_DIRS:
@@ -263,12 +279,22 @@ def run():
         collect_returns(src, tree.root_node, returns)
         collect_param_counts(src, tree.root_node, param_counts, param_types)
 
+    NESTED, NESTED_FILE = {}, {}
+    for path, (src, tree) in trees.items():
+        before = set(NESTED)
+        collect_nested_types(src, tree.root_node, NESTED)
+        for k in NESTED:
+            if k not in before and k not in NESTED_FILE:
+                NESTED_FILE[k] = path
+
     api_checks = api_bad = 0
     static_checks = static_bad = 0
     member_checks = member_bad = 0
     void_checks = void_bad = 0
     arg_checks = arg_bad = 0
     type_checks = type_bad = 0
+    nested_checks = nested_bad = 0
+    struct_checks = struct_bad = 0
     problems = []
 
     for path, (src, tree) in trees.items():
@@ -419,6 +445,46 @@ def run():
                     break
             api_checks += 1
 
+    # 7. вложенный тип без квалификации: ToastKind из другого файла — только HUD.ToastKind (CS0103)
+    for path, (src, tree) in trees.items():
+        rel = os.path.relpath(path, ROOT)
+        s8 = src.decode("utf-8", errors="ignore")
+        for name, container in NESTED.items():
+            if NESTED_FILE.get(name) == path:
+                continue
+            # ловим только использование «Имя.член»: объявления методов и вызовы X.Имя() не трогаем
+            for m in re.finditer(r"\b%s\s*\.(?!\.)" % re.escape(name), s8):
+                before = s8[max(0, m.start() - len(container) - 4):m.start()]
+                if re.search(r"\b%s\s*\.\s*\Z" % re.escape(container), before):
+                    continue
+                line_start = s8.rfind("\n", 0, m.start()) + 1
+                if "//" in s8[line_start:m.start()]:
+                    continue
+                nested_checks += 1
+                nested_bad += 1
+                problems.append("%s:%d  %s — вложенный тип (объявлен внутри %s): из этого файла нужен префикс %s.%s"
+                                % (rel, s8.count("\n", 0, m.start()) + 1, name, container, container, name))
+                break
+
+    # 8. CS1612: свойство структуры-возврата меняют напрямую: ps.main.x = ... — не скомпилируется
+    STRUCT_PROPS = ("main", "emission", "shape", "collision", "colorOverLifetime",
+                    "sizeOverLifetime", "velocityOverLifetime", "rotationOverLifetime",
+                    "limitVelocityOverLifetime", "noise", "textureSheetAnimation",
+                    "subEmitters", "trigger", "inheritVelocity")
+    pat1612 = re.compile(r"\.\s*(%s)\s*\.\s*\w+\s*=(?!=)" % "|".join(STRUCT_PROPS))
+    for path, (src, tree) in trees.items():
+        rel = os.path.relpath(path, ROOT)
+        s8 = src.decode("utf-8", errors="ignore")
+        for m in pat1612.finditer(s8):
+            line_start = s8.rfind("\n", 0, m.start()) + 1
+            if "//" in s8[line_start:m.start()]:
+                continue
+            struct_checks += 1
+            struct_bad += 1
+            problems.append("%s:%d  %s — прямое изменение свойства структуры-возврата (CS1612): "
+                            "сначала сохрани в переменную: var m = ps.main; m.x = ..."
+                            % (rel, s8.count("\n", 0, m.start()) + 1, m.group(0).strip()))
+
     print("Файлов проверено: %d, с ошибками: %d" % (len(files), syntax_errors))
     print("проверено имён API на совместимость с 2022.3: %d, проблем: %d" % (api_checks, api_bad))
     print("типов: %d | проверено статических обращений: %d | проблем: %d"
@@ -427,11 +493,14 @@ def run():
     print("проверено присваиваний результата вызова: %d | проблем: %d" % (void_checks, void_bad))
     print("проверено вызовов с проверкой числа аргументов: %d | проблем: %d" % (arg_checks, arg_bad))
     print("проверено типов аргументов-литералов: %d | проблем: %d" % (type_checks, type_bad))
+    print("проверено упоминаний вложенных типов: %d | проблем: %d" % (nested_checks, nested_bad))
+    print("проверено изменений свойств структур-возвратов: %d | проблем: %d" % (struct_checks, struct_bad))
     if problems:
         print("\nНайдено:")
         for p in problems:
             print("   " + p)
-    return 1 if (syntax_errors or static_bad or member_bad or void_bad or arg_bad or type_bad or api_bad) else 0
+    return 1 if (syntax_errors or static_bad or member_bad or void_bad or arg_bad
+                or type_bad or api_bad or nested_bad or struct_bad) else 0
 
 
 def _errors(node):

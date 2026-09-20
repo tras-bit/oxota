@@ -14,6 +14,12 @@ namespace Samsar
         public int loot;
         public int bestPlace = 99;
         public List<string> achievements = new List<string>();
+        // последний бой (для ангара)
+        public int lastPlace;
+        public int lastKills;
+        public float lastDamage;
+        public int lastLevel;
+        public int lastLoot;
     }
 
     public static class Profile
@@ -46,6 +52,11 @@ namespace Samsar
             Data.damage += damage;
             Data.loot += GameSession.LastLoot;
             Data.bestPlace = Mathf.Min(Data.bestPlace, place);
+            Data.lastPlace = place;
+            Data.lastKills = kills;
+            Data.lastDamage = damage;
+            Data.lastLevel = GameSession.LastLevel;
+            Data.lastLoot = GameSession.LastLoot;
             Save();
         }
 

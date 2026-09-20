@@ -6,7 +6,8 @@ namespace Samsar
 {
     public static class Fx
     {
-        static Material unlit, additive, smokeMat;
+        static Material unlit, smokeMat;
+        static Shader particleShader;
         static Transform root;
 
         static Transform Root()
@@ -47,14 +48,13 @@ namespace Samsar
         {
             Material cached;
             if (matCache.TryGetValue(c, out cached) && cached != null) return cached;
-            if (additive == null)
+            if (particleShader == null)
             {
-                var sh = Shader.Find("Particles/Standard Unlit");
-                if (sh == null) sh = Shader.Find("Legacy Shaders/Particles/Additive");
-                if (sh == null) sh = Shader.Find("Sprites/Default");
-                additive = sh;
+                particleShader = Shader.Find("Particles/Standard Unlit");
+                if (particleShader == null) particleShader = Shader.Find("Legacy Shaders/Particles/Additive");
+                if (particleShader == null) particleShader = Shader.Find("Sprites/Default");
             }
-            var m = new Material(additive);
+            var m = new Material(particleShader);
             m.color = c;
             m.SetColor("_Color", c);
             m.SetColor("_TintColor", c);
@@ -175,7 +175,8 @@ namespace Samsar
             Object.Destroy(lightGo, 0.25f);
 
             var ps = NewSystem("debris", Color.white, 0.1f, 0.4f, 1.4f);
-            ps.main.gravityModifier = 1.4f;
+            var debMain = ps.main;
+            debMain.gravityModifier = 1.4f;
             Burst(ps, 25, pos, 14f * scale, 1.4f, new Color(0.35f, 0.32f, 0.28f), 0.1f, 0.4f);
         }
 

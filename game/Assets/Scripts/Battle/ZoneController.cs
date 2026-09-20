@@ -37,6 +37,7 @@ namespace Samsar
 
         void Update()
         {
+            playerWarnTimer -= Time.deltaTime;
             if (!Active) return;
 
             phaseTimer -= Time.deltaTime;
@@ -76,9 +77,9 @@ namespace Samsar
                 if (outside)
                 {
                     t.ApplyRawDamage(Rules.ZoneDamagePerSecond, null);
-                    if (t.IsPlayer)
+                    if (t.IsPlayer && playerWarnTimer <= 0f)
                     {
-                        playerWarnTimer = 2f;
+                        playerWarnTimer = 3f;   // не спамим каждую секунду — раз в три
                         HUD.Toast("Вы в красной зоне! Немедленно уходите", HUD.ToastKind.Bad);
                         Sfx.ZoneWarning();
                     }

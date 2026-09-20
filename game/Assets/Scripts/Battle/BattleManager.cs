@@ -152,7 +152,7 @@ namespace Samsar
                 {
                     modelWarnings++;
                     HUD.Toast("Модель «" + spec.id + "» не найдена — временная заглушка. " +
-                              "В Unity: Samsar → 0. СОБРАТЬ ВСЁ", ToastKind.Bad);
+                              "В Unity: Samsar → 0. СОБРАТЬ ВСЁ", HUD.ToastKind.Bad);
                 }
             }
             var rb = go.GetComponent<Rigidbody>();
@@ -300,6 +300,7 @@ namespace Samsar
             GameSession.LastDamage = player != null ? player.DamageDealt : 0f;
             GameSession.LastSurvived = player != null ? player.SurvivalTime : 0f;
             GameSession.LastLoot = player != null ? player.LootPicked : 0;
+            GameSession.LastLevel = player != null ? player.Level : 1;
             GameSession.LastVictory = PlayerPlace == 1 && player != null && !player.Dead;
 
             Profile.RecordBattle(GameSession.LastPlace, GameSession.LastKills, GameSession.LastDamage,

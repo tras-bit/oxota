@@ -31,7 +31,6 @@ namespace Samsar
             if (tank == null || tank.Dead) { Fire = false; Throttle = 0f; return; }
 
             // движение
-            var strafe = 0f;
             Throttle = Input.GetAxis("Vertical");
             Steer = Input.GetAxis("Horizontal");
 

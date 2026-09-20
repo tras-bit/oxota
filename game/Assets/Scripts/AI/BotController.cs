@@ -190,7 +190,8 @@ namespace Samsar
                 }
                 state = "патруль";
                 if (Vector3.Distance(tank.transform.position, patrolPoint) < 15f ||
-                    ZoneController.Instance != null && !ZoneController.Instance.IsInside(patrolPoint, ZoneController.Instance.YellowRadius * 0.8f))
+                    ZoneController.Instance != null &&
+                    Vector3.Distance(patrolPoint, ZoneController.Instance.Center) > ZoneController.Instance.YellowRadius * 0.8f)
                 {
                     Vector2 p = Random.insideUnitCircle * (ZoneController.Instance != null ? ZoneController.Instance.RedRadius * 0.6f : 400f);
                     patrolPoint = new Vector3(p.x, 0f, p.y);

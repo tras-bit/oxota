@@ -169,6 +169,7 @@ namespace Samsar
             GunTip.localPosition = new Vector3(0f, 0f, gb2.extents.z * 1.0f + 0.3f);
 
             // ---- пыль из-под гусениц ----
+            float halfW = Mathf.Max(0.6f, WorldBoundsOf(HullRoot).extents.x);   // полная полуширина с гусеницами
             for (int s = -1; s <= 1; s += 2)
             {
                 Vector3 p = hull.center + transform.right * (s * (halfW + 0.25f))
