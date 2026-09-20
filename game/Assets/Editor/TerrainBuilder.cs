@@ -56,18 +56,25 @@ namespace Samsar.EditorTools
                                      Texture2D rock, Texture2D rockN, Texture2D asphalt, Texture2D asphaltN,
                                      float seed)
         {
+            // Слои ландшафта — отдельные ассеты-файлы: ссылка из TerrainData на
+            // сохранённый файл переживает любые пересохранения. Раньше слои добавлялись
+            // под-ассетами в BattleTerrain.asset через AssetDatabase.AddObjectToAsset,
+            // но в Unity 2022.3 чтение data.terrainLayers после записи возвращает
+            // не те объекты (вплоть до null) — сборка падала на ровном месте.
+            Directory.CreateDirectory("Assets/Terrain");
+            var layers = new[]
+            {
+                SaveLayer("Grass", grass, grassN, 12f),
+                SaveLayer("Dirt", dirt, dirtN, 14f),
+                SaveLayer("Rock", rock, rockN, 18f),
+                SaveLayer("Asphalt", asphalt, asphaltN, 20f),
+            };
+
             var data = new TerrainData();
             data.heightmapResolution = HeightRes;
             data.alphamapResolution = AlphaRes;
             data.size = new Vector3(SizeMeters, 90f, SizeMeters);
-
-            data.terrainLayers = new[]
-            {
-                MakeLayer("Grass", grass, grassN, 12f),
-                MakeLayer("Dirt", dirt, dirtN, 14f),
-                MakeLayer("Rock", rock, rockN, 18f),
-                MakeLayer("Asphalt", asphalt, asphaltN, 20f),
-            };
+            data.terrainLayers = layers;
 
             var heights = new float[HeightRes, HeightRes];
             var rnd = new System.Random((int)seed);
@@ -91,12 +98,10 @@ namespace Samsar.EditorTools
             data.SetHeights(0, 0, heights);
             data.SetAlphamaps(0, 0, PaintLayers(heights, ox, oz));
 
-            // данные ландшафта и слои обязаны быть ассетами, иначе сцена их потеряет
-            Directory.CreateDirectory("Assets/Terrain");
-            var assetPath = "Assets/Terrain/BattleTerrain.asset";
-            if (File.Exists(assetPath)) AssetDatabase.DeleteAsset(assetPath);
-            AssetDatabase.CreateAsset(data, assetPath);
-            foreach (var l in data.terrainLayers) AssetDatabase.AddObjectToAsset(l, data);
+            // данные ландшафта обязаны быть ассетом, иначе сцена его потеряет
+            // (слои уже сохранены отдельными файлами выше)
+            DeleteAssetIfExists("Assets/Terrain/BattleTerrain.asset");
+            AssetDatabase.CreateAsset(data, "Assets/Terrain/BattleTerrain.asset");
             AssetDatabase.SaveAssets();
 
             var go = Terrain.CreateTerrainGameObject(data);
@@ -107,8 +112,28 @@ namespace Samsar.EditorTools
             terrain.detailObjectDistance = 120f;
             terrain.treeDistance = 0f;
             terrain.drawInstanced = true;
-            go.AddComponent<TerrainCollider>().terrainData = data;
+            // CreateTerrainGameObject уже вешает TerrainCollider — берём существующий,
+            // второй не нужен (было: задвоенный коллайдер и падение на ровном месте)
+            var collider = go.GetComponent<TerrainCollider>();
+            if (collider == null) collider = go.AddComponent<TerrainCollider>();
+            collider.terrainData = data;
             return terrain;
+        }
+
+        /// <summary>Создаёт слой и сразу сохраняет его отдельным ассетом — так ссылка
+        /// из TerrainData никогда не теряется и не зависит от геттера terrainLayers.</summary>
+        static TerrainLayer SaveLayer(string name, Texture2D albedo, Texture2D normal, float tileSize)
+        {
+            var layer = MakeLayer(name, albedo, normal, tileSize);
+            var path = "Assets/Terrain/Layer_" + name + ".terrainlayer";
+            DeleteAssetIfExists(path);
+            AssetDatabase.CreateAsset(layer, path);
+            return layer;
+        }
+
+        static void DeleteAssetIfExists(string path)
+        {
+            if (File.Exists(path)) AssetDatabase.DeleteAsset(path);
         }
 
         static TerrainLayer MakeLayer(string name, Texture2D albedo, Texture2D normal, float tileSize)

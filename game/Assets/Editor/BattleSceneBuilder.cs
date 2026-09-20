@@ -74,6 +74,16 @@ namespace Samsar.EditorTools
             var rockN = Load<Texture2D>("ground_rock_normal.png");
             var asphalt = Load<Texture2D>("ground_asphalt_albedo.jpg");
             var asphaltN = Load<Texture2D>("ground_asphalt_normal.png");
+            // На самом первом открытии Unity мог ещё не доделать импорт — тогда Load
+            // вернёт null (какие именно — см. предупреждения в Console). Ландшафт без
+            // текстур строить нельзя — скажем об этом по-человечески, а не падением.
+            if (grass == null || grassN == null || dirt == null || dirtN == null ||
+                rock == null || rockN == null || asphalt == null || asphaltN == null)
+                throw new System.Exception(
+                    "Текстуры земли (ground_*.jpg / ground_*.png) ещё не импортировались. " +
+                    "Дождись, пока Unity закончит импорт (индикатор внизу справа), и запусти " +
+                    "сборку снова: меню Samsar → 0. СОБРАТЬ ВСЁ. Если снова не поможет — " +
+                    "перезапусти Unity и дай ему минуту.");
             var terrain = TerrainBuilder.Create(grass, grassN, dirt, dirtN, rock, rockN, asphalt, asphaltN, 20260919f);
             terrain.transform.position = new Vector3(-TerrainBuilder.SizeMeters * 0.5f, -14f, -TerrainBuilder.SizeMeters * 0.5f);
             return terrain;
