@@ -1,4 +1,5 @@
 // Боевые эффекты: попадания, взрывы, дым, трассеры. Всё создаётся кодом, без префабов.
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Samsar
@@ -19,8 +20,15 @@ namespace Samsar
             return root;
         }
 
+        // Материалы эффектов кэшируются по цвету: на бою в 30 машин каждая вспышка
+        // и попадание создавали бы новый Material (нативный объект, не освобождается
+        // вместе с частицей) — за 20 минут боя их набегали бы тысячи.
+        static readonly Dictionary<Color, Material> matCache = new Dictionary<Color, Material>();
+
         public static Material UnlitMaterial(Color c)
         {
+            Material cached;
+            if (matCache.TryGetValue(c, out cached) && cached != null) return cached;
             if (unlit == null)
             {
                 var sh = Shader.Find("Particles/Standard Unlit");
@@ -31,11 +39,14 @@ namespace Samsar
             var m = new Material(unlit);
             m.color = c;
             m.SetColor("_TintColor", c);
+            matCache[c] = m;
             return m;
         }
 
         static Material ParticleMat(Color c)
         {
+            Material cached;
+            if (matCache.TryGetValue(c, out cached) && cached != null) return cached;
             if (additive == null)
             {
                 var sh = Shader.Find("Particles/Standard Unlit");
@@ -48,6 +59,7 @@ namespace Samsar
             m.SetColor("_Color", c);
             m.SetColor("_TintColor", c);
             m.mainTexture = SmokeTexture();
+            matCache[c] = m;
             return m;
         }
 

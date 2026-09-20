@@ -33,9 +33,7 @@ namespace Samsar
             col.isTrigger = true;
 
             var rend = go.GetComponent<MeshRenderer>();
-            rend.material = new Material(Shader.Find("Standard"));
-            rend.material.color = ColorFor(kind, airDrop);
-            rend.material.SetFloat("_Glossiness", 0.6f);
+            rend.material = BoxMaterial(ColorFor(kind, airDrop));
 
             var lb = go.AddComponent<LootBox>();
             lb.kind = kind;
@@ -49,6 +47,21 @@ namespace Samsar
                 HUD.Toast("Воздушный груз сброшен! Отмечен на карте", HUD.ToastKind.Info);
             }
             return lb;
+        }
+
+        // материал ящика кэшируется по цвету: ящиков за бой — сотни, и каждому
+        // создавался свой Material (нативный объект, не освобождается с ящиком)
+        static readonly Dictionary<Color, Material> boxMats = new Dictionary<Color, Material>();
+
+        static Material BoxMaterial(Color c)
+        {
+            Material m;
+            if (boxMats.TryGetValue(c, out m) && m != null) return m;
+            m = new Material(Shader.Find("Standard"));
+            m.color = c;
+            m.SetFloat("_Glossiness", 0.6f);
+            boxMats[c] = m;
+            return m;
         }
 
         static Color ColorFor(LootKind k, bool air)
