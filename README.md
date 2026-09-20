@@ -16,7 +16,7 @@
 ```bash
 # 1. Игра
 Unity Hub → Add project from disk → папка game/
-Открыть в Unity 2022.3.62f2 → меню «Samsar» → «0. СОБРАТЬ ВСЁ» → Play
+Открыть в Unity 2022.3.62f2 → сцены соберутся сами при первом открытии → Play
 
 # 2. Сайт с анкетой (60 вопросов) и превью проекта
 cd /home/user/oxota && python3 -m http.server 8000
