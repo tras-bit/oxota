@@ -28,9 +28,12 @@ SCRIPTS = os.path.join(GAME, "Assets", "Scripts")
 
 TANK_KEYS = ["lt", "mt", "ht", "td"]
 PROP_KEYS = ["house", "house_small", "warehouse", "station", "tower", "tree_spruce",
-             "tree_birch", "fence", "container", "block", "rubble", "rail_segment", "bale"]
+             "tree_birch", "fence", "container", "block", "rubble", "rail_segment", "bale",
+             "wreck"]
 # листва в игре использует набор травы (см. MAT_Leaf в TankAssetBuilder) — своего набора нет
-TEX_SETS = ["steel_olive", "steel_sand", "steel_grey", "steel_green", "metal_rusty",
+TEX_SETS = ["steel_olive", "steel_sand", "steel_grey", "steel_green",
+            "steel_bronze", "steel_red", "steel_black",       # камуфляжи спецмашин
+            "metal_rusty",
             "metal_dark", "rubber", "concrete", "wood", "optics", "ground_grass",
             "ground_dirt", "ground_rock", "ground_asphalt"]
 REQUIRED_FILES = [

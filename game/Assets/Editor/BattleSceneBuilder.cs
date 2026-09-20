@@ -224,6 +224,18 @@ namespace Samsar.EditorTools
                 var go = SpawnProp(props, "block", p, (float)rnd.NextDouble() * 360f, terrain, smallRoot);
                 MarkDestructible(go, 700f, DestructibleProp.PropKind.Small, null, null);
             }
+            // сгоревшие танки — укрытия и ориентиры прошлых боёв (не разрушаются: уже мертвы)
+            Vector3[] wrecks =
+            {
+                new Vector3(-64f, 0f, 128f),     // перекрёсток в городе
+                new Vector3(158f, 0f, -96f),     // южная улица
+                new Vector3(524f, 0f, 418f),     // промзона, между ангарми
+                new Vector3(-640f, 0f, 400f),    // привокзальная площадь
+                new Vector3(836f, 0f, -64f),     // восточная промзона
+                new Vector3(64f, 0f, -424f)      // выезд из города на юг
+            };
+            foreach (var w in wrecks)
+                SpawnProp(props, "wreck", w, Random.Range(0f, 360f), terrain, smallRoot);
         }
 
         static Vector3 RandomPoint(System.Random rnd, float radius)

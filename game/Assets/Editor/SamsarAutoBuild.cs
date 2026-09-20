@@ -13,7 +13,8 @@ namespace Samsar.EditorTools
     public static class SamsarAutoBuild
     {
         // Поднять Version, чтобы у всех, у кого проект уже открыт, сцены пересобрались заново.
-        const string Version = "1";
+        // v2: камуфляжи спецмашин + сгоревшие танки на карте.
+        const string Version = "2";
         const string MarkerPath = "Assets/Samsar.autobuild";
         const string MainScene = "Assets/Scenes/Main.unity";
         const string BattleScene = "Assets/Scenes/Battle.unity";

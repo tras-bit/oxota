@@ -216,6 +216,10 @@ def main():
     mat_steel(np.random.default_rng(SEED + 1), (0.50, 0.45, 0.29), "steel_sand")   # песочный
     mat_steel(np.random.default_rng(SEED + 2), (0.33, 0.36, 0.42), "steel_grey")   # серо-синий
     mat_steel(np.random.default_rng(SEED + 3), (0.20, 0.28, 0.18), "steel_green")  # тёмно-зелёный
+    # камуфляжи спецмашин: раньше все три были оливковыми, как ЛТ
+    mat_steel(np.random.default_rng(SEED + 4), (0.33, 0.27, 0.18), "steel_bronze")  # «Бастион», бронза
+    mat_steel(np.random.default_rng(SEED + 5), (0.46, 0.24, 0.20), "steel_red")     # «Арлекин», красно-бурый
+    mat_steel(np.random.default_rng(SEED + 6), (0.15, 0.15, 0.17), "steel_black")   # «Ворон», чёрный
     mat_rusty(rng)
     mat_dark_metal(rng)
     mat_rubber(rng)

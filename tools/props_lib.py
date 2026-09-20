@@ -28,6 +28,9 @@ def mats():
                       "optics_mask.png", 0.9, 0.08),
         "leaf": _mat("MAT_Leaf", "ground_grass_albedo.jpg", "ground_grass_normal.png",
                      "ground_grass_mask.png", 0.0, 0.8, tint=(0.30, 0.52, 0.22)),
+        # сгоревший металл (в Unity маппится в MAT_MetalDark — тёмная сталь)
+        "burnt": _mat("MAT_BurntMetal", "steel_olive_albedo.jpg", "steel_olive_normal.png",
+                      "steel_olive_mask.png", 0.35, 0.78, tint=(0.09, 0.08, 0.075)),
     }
 
 
@@ -274,4 +277,28 @@ BUILDERS = {
     "rubble": lambda M: rubble(M),
     "rail_segment": lambda M: rail_segment(M),
     "bale": lambda M: bale(M),
+    "wreck": lambda M: wreck(M),
 }
+
+
+def wreck(M):
+    """Сгоревший танк: корпус на брюхе, башня сорвана и завалилась — укрытие и ориентир."""
+    r = root("PROP_Wreck")
+    b = M["burnt"]
+    # корпус, осевший на пробитые гусеницы
+    box("hull", (2.4, 5.2, 0.85), (0, 0, 0.55), rot=(0, 0, math.radians(3)), material=b, parent=r)
+    box("glacis", (2.4, 1.35, 0.24), (0, 2.6, 0.80), rot=(math.radians(-32), 0, 0), material=b, parent=r)
+    box("deck", (2.15, 2.7, 0.16), (0, -0.9, 1.02), material=b, parent=r)
+    box("engine", (2.0, 1.2, 0.36), (0, -2.2, 0.92), rot=(math.radians(14), 0, 0), material=b, parent=r)
+    # башня сорвана и лежит рядом, ствол задран
+    box("turret", (1.9, 2.5, 0.62), (1.5, -1.4, 0.42), rot=(0, math.radians(26), math.radians(14)), material=b, parent=r)
+    cyl("gun", 0.09, 3.0, (2.4, -0.5, 0.78), rot=(math.radians(-74), 0, math.radians(20)),
+        verts=10, material=b, parent=r)
+    # гусеницы: одна на месте, вторая сползла; сорванные катки
+    box("track_l", (0.45, 5.6, 0.6), (-1.4, 0, 0.42), material=M["metal"], parent=r)
+    box("track_r", (0.45, 3.6, 0.5), (1.7, 0.7, 0.28), rot=(0, math.radians(9), 0), material=M["metal"], parent=r)
+    for i in range(3):
+        cyl("wheel%d" % i, 0.33, 0.22, (-1.55, -1.7 + i * 1.4, 0.34),
+            rot=(math.radians(90), 0, 0), verts=14, material=M["metal"], parent=r)
+    box("stowage", (0.75, 0.5, 0.35), (-0.7, 2.3, 1.18), rot=(0.1, 0.4, 0.15), material=b, parent=r)
+    return r

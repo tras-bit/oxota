@@ -123,6 +123,14 @@ def parse_warehouses(text):
             re.findall(r"new Vector3\(([-\d.f]+),\s*([-\d.f]+),\s*([-\d.f]+)\)", block.group(1))]
 
 
+def parse_wrecks(text):
+    block = re.search(r"Vector3\[\] wrecks\s*=\s*\{(.*?)\};", text, re.S)
+    if not block:
+        return []
+    return [(num(a), num(c)) for a, b, c in
+            re.findall(r"new Vector3\(([-\d.f]+),\s*([-\d.f]+),\s*([-\d.f]+)\)", block.group(1))]
+
+
 def parse_spawns(text):
     m = re.search(r"int n = (\d+);", text)
     n = int(m.group(1)) if m else 32
@@ -146,6 +154,7 @@ def main():
     scene, terrain, rules = read(SCENE_CS), read(TERRAIN_CS), read(RULES_CS)
     roads = parse_roads(terrain)
     warehouses = parse_warehouses(scene)
+    wrecks = parse_wrecks(scene)
     spawn_n, spawn_r0, spawn_step = parse_spawns(scene)
     zones = parse_zone(rules)
 
@@ -188,6 +197,11 @@ def main():
             c.line(a[0], a[1], b[0], b[1], (110, 104, 96), 9)
             c.line(a[0], a[1], b[0], b[1], (72, 72, 74), 5)
             c.line(a[0], a[1], b[0], b[1], (196, 196, 180), 1)
+
+    # сгоревшие танки — ориентиры прошлых боёв
+    for wx, wz in wrecks:
+        px, py = to_px(wx, wz)
+        c.disc(px, py, 5, (28, 24, 22))
 
     # кольцо выездов и зона сужения
     for i in range(len(zones)):

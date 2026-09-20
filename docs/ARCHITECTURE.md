@@ -7,7 +7,7 @@ Blender (tools/*.py)                 Unity (game/)
 ─────────────────────                ─────────────────────────────────────────
 tank_lib.py    ──► 4 модели   FBX ─► Assets/Models/Tanks/*.fbx ─► префабы ─┐
                     (7 машин в ростере: по одной на класс + 3 спецмашины)      │
-props_lib.py   ──► 13 объектов FBX ─► Assets/Models/Props/*.fbx ─► префабы ─┤
+props_lib.py   ──► 14 объектов FBX ─► Assets/Models/Props/*.fbx ─► префабы ─┤
 make_textures.py ─► PBR 2К    ─────► Assets/Textures/*         ─► материалы ┤
                                                                             ▼
                                               SamsarAutoBuild (редактор сам при первом открытии; вручную — Samsar → 0)

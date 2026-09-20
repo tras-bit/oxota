@@ -16,7 +16,8 @@ namespace Samsar.EditorTools
         const string PropPrefabDir = "Assets/Prefabs/Props";
 
         public static readonly string[] CamoTextures =
-            { "steel_olive", "steel_sand", "steel_grey", "steel_green" };
+            { "steel_olive", "steel_sand", "steel_grey", "steel_green",
+              "steel_bronze", "steel_red", "steel_black" };
 
         [MenuItem("Samsar/1. Обновить материалы и префабы", false, 10)]
         public static void RebuildAll()
@@ -147,7 +148,7 @@ namespace Samsar.EditorTools
                 }
                 var instance = (GameObject)PrefabUtility.InstantiatePrefab(model);
                 instance.name = spec.id;
-                AssignMaterials(instance, CamoFor(spec.cls));
+                AssignMaterials(instance, CamoFor(spec));
                 RemoveChildColliders(instance);
                 var prefabPath = TankPrefabDir + "/" + spec.id + ".prefab";
                 PrefabUtility.SaveAsPrefabAsset(instance, prefabPath);
@@ -161,10 +162,17 @@ namespace Samsar.EditorTools
             return AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/" + name + ".mat");
         }
 
-        /// <summary>Камуфляж по классу машины (у спецмашин ключ свой, имя FBX тут не подскажет).</summary>
-        static string CamoFor(TankClass cls)
+        /// <summary>Камуфляж машины: спецмашины — свой цвет (иначе все три были оливковыми,
+        /// как ЛТ), обычные — по классу.</summary>
+        static string CamoFor(TankSpec spec)
         {
-            switch (cls)
+            switch (spec.id)
+            {
+                case "bastion": return "steel_bronze";   // ТТ «Бастион»
+                case "arlequin": return "steel_red";     // ЛТ «Арлекин»
+                case "raven": return "steel_black";      // ПТ «Ворон»
+            }
+            switch (spec.cls)
             {
                 case TankClass.LT: return "steel_olive";
                 case TankClass.MT: return "steel_sand";

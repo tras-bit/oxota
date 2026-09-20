@@ -260,6 +260,29 @@ def build_tanks():
         r.location = ((i % 2) * 9.6 - 4.8, 3.9 if i < 2 else -3.9, 0.0)
     new_camera(allmesh, direction=(0.62, -1.50, 0.34), margin=0.99, lens=86)
     render(os.path.join(GEN, "tank_roster.png"), res=(1600, 900), samples=42)
+
+    # спецмашины: геометрия классов, но свой камуфляж (в Unity цвет ставит TankAssetBuilder)
+    reset()
+    setup_world()
+    specials = [("bastion", "ТТ «Бастион»", "ht", "steel_bronze"),
+                ("arlequin", "ЛТ «Арлекин»", "lt", "steel_red"),
+                ("raven", "ПТ «Ворон»", "td", "steel_black")]
+    sroot = []
+    for i, (sid, title, base, camo) in enumerate(specials):
+        bs = tank_lib.SPECS[base]
+        spec = tank_lib.TankSpec(sid, title, bs.length, bs.width, bs.hull_h, bs.turret,
+                                 bs.wheels, bs.gun_len, bs.gun_cal, bs.armor_class, camo=camo,
+                                 track_w=bs.track_w, wheel_r=bs.wheel_r,
+                                 clearance=bs.clearance, turret_h=bs.turret_h,
+                                 track_pitch=bs.track_pitch, gun_style=bs.gun_style)
+        r = tank_lib.build_tank(spec)
+        face_unity(r)
+        r.location = ((i - 1) * 9.5, 0.0, 0.0)
+        sroot.append(r)
+    smesh = [o for r in sroot for o in children_recursive(r) if o.type == "MESH"]
+    new_camera(smesh, direction=(0.62, -1.50, 0.34), margin=1.08, lens=64)
+    render(os.path.join(GEN, "tank_specials.png"), res=(1600, 900), samples=42)
+    print("   спецмашины отрендерены: tank_specials.png")
     verify([os.path.join(GAME_MODELS, "Tanks", s.key + ".fbx") for s in tank_lib.SPECS.values()])
 
 
