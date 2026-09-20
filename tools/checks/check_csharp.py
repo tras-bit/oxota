@@ -251,6 +251,81 @@ def collect_nested_types(src, node, out, container=None):
             collect_nested_types(src, child, out, container)
 
 
+SCOPE_NODES = ("block", "for_statement", "foreach_statement", "using_statement",
+               "catch_clause", "switch_section")
+
+
+def check_shadowing(src, tree, path, problems):
+    """CS0136/CS0128: скрытие имён локальных и параметров внутри метода.
+    В C# область видимости локальной — весь блок, даже ДО её объявления, поэтому
+    «внутренний» halfW конфликтует и с объявленным ниже «внешним» halfW."""
+    found = 0
+    SCOPE = ("block", "for_statement", "foreach_statement", "using_statement",
+             "catch_clause", "switch_section")
+
+    def scope_of(n, method):
+        p = n
+        while p is not None and p is not method:
+            if p.type in SCOPE:
+                return p
+            p = p.parent
+        return method                      # параметры и «просто тело метода» живут здесь
+
+    def ancestors(sc, method):
+        out = []
+        q = sc
+        while q is not None and q is not method:
+            q = q.parent
+            while q is not None and q is not method and q.type not in SCOPE:
+                q = q.parent
+            if q is not None:
+                out.append(q)
+        if sc is not method:
+            out.append(method)
+        return out
+
+    for method in _walk(tree.root_node):
+        if method.type not in ("method_declaration", "constructor_declaration"):
+            continue
+        entries = []                       # (узел-область, имя, строка)
+
+        def add(n, name):
+            entries.append((scope_of(n, method), name, n.start_point[0] + 1))
+
+        pl = method.child_by_field_name("parameters")
+        if pl is not None:
+            for prm in _walk(pl):
+                if prm.type == "parameter":
+                    nm = prm.child_by_field_name("name")
+                    if nm is not None:
+                        add(prm, text(src, nm))
+        for node in _walk(method):
+            if node.type == "variable_declarator":
+                ids = [c for c in node.children if c.type == "identifier"]
+                if ids:
+                    add(node, text(src, ids[0]))
+
+        # NB: у tree-sitter объекты-узлы не стабильны по идентичности (каждый .parent —
+        # новая обёртка), поэтому сравниваем области по (тип, позиция), а не через is/id().
+        def key(n):
+            return (n.type, n.start_byte)
+
+        flagged = set()
+        for sc, name, line in entries:
+            chain = {key(a) for a in ancestors(sc, method)}
+            chain.add(key(sc))
+            for sc2, name2, line2 in entries:
+                if name2 == name and (key(sc2) != key(sc) or line2 != line) and key(sc2) in chain:
+                    if (name, line) not in flagged:
+                        flagged.add((name, line))
+                        problems.append("%s:%d  %s — имя уже занято в этом или объемлющем блоке "
+                                        "(CS0136/CS0128): в C# локальная видна всему блоку, даже до "
+                                        "объявления; переименуй"
+                                        % (os.path.relpath(path, ROOT), line, name))
+                        found += 1
+    return found
+
+
 def run():
     files = []
     for d in SRC_DIRS:
@@ -295,7 +370,13 @@ def run():
     type_checks = type_bad = 0
     nested_checks = nested_bad = 0
     struct_checks = struct_bad = 0
+    shadow_checks = shadow_bad = 0
     problems = []
+
+    # CS0136/CS0128: скрытие имён локальных и параметров внутри метода
+    for path, (src, tree) in trees.items():
+        shadow_checks += 1
+        shadow_bad += check_shadowing(src, tree, path, problems)
 
     for path, (src, tree) in trees.items():
         # 1. статические обращения Тип.Член
@@ -495,12 +576,13 @@ def run():
     print("проверено типов аргументов-литералов: %d | проблем: %d" % (type_checks, type_bad))
     print("проверено упоминаний вложенных типов: %d | проблем: %d" % (nested_checks, nested_bad))
     print("проверено изменений свойств структур-возвратов: %d | проблем: %d" % (struct_checks, struct_bad))
+    print("проверено методов на скрытие имён (CS0136): %d | проблем: %d" % (shadow_checks, shadow_bad))
     if problems:
         print("\nНайдено:")
         for p in problems:
             print("   " + p)
     return 1 if (syntax_errors or static_bad or member_bad or void_bad or arg_bad
-                or type_bad or api_bad or nested_bad or struct_bad) else 0
+                or type_bad or api_bad or nested_bad or struct_bad or shadow_bad) else 0
 
 
 def _errors(node):

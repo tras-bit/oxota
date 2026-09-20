@@ -142,8 +142,10 @@ namespace Samsar
                 }
                 else
                 {
-                    float halfW = Mathf.Max(0.6f, hull.extents.x);
-                    c = hull.center + new Vector3(s * (halfW + 0.05f), -hull.extents.y * 0.25f, 0f);
+                    // запасной расчёт, если лент в модели не нашлось (внизу метода есть свой halfW
+                    // для пыли — в C# локальная видна всему блоку, поэтому имя должно отличаться)
+                    float fallbackHalfW = Mathf.Max(0.6f, hull.extents.x);
+                    c = hull.center + new Vector3(s * (fallbackHalfW + 0.05f), -hull.extents.y * 0.25f, 0f);
                     size = new Vector3(0.75f, hull.size.y * 0.5f, hull.size.z * 0.96f);
                 }
                 AddBox(HullRoot, "hit_tracks" + s, c, size, ModuleType.Tracks);
