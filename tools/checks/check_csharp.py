@@ -91,6 +91,36 @@ def collect_types(src, node, out):
         collect_types(src, child, out)
 
 
+def collect_returns(src, node, out):
+    """Возвращаемый тип методов: out[(ИмяТипа, ИмяМетода)] = набор типов («void», «ParticleSystem»…).
+    Нужно, чтобы ловить «присваивание результата void-метода» — ошибка компиляции,
+    которую иначе видно только в редакторе."""
+    for child in node.children:
+        if child.type in TYPE_KINDS:
+            name_node = child_of_kind(child, "identifier")
+            if name_node is not None:
+                tname = text(src, name_node)
+                for m in _walk(child):
+                    if m.type != "method_declaration":
+                        continue
+                    nm = _member_name(src, m)
+                    if not nm:
+                        continue
+                    # тип возврата — то, что стоит перед именем метода
+                    idx = None
+                    for i, c in enumerate(m.children):
+                        if c.type == "identifier" and text(src, c) == nm:
+                            idx = i
+                            break
+                    if idx is None:
+                        continue
+                    ret = " ".join(text(src, c) for c in m.children[:idx]).strip()
+                    ret = ret.split()[-1] if ret else ""
+                    if ret:
+                        out.setdefault((tname, nm), set()).add(ret.split("<")[0])
+        collect_returns(src, child, out)
+
+
 def _member_name(src, node):
     """Имя метода/свойства/события: identifier перед списком параметров или аксессоров
     (а не тип возвращаемого значения — на этом легко ошибиться)."""
@@ -146,6 +176,7 @@ def run():
 
     parser = Parser(Language(tscs.language()))
     trees, types = {}, defaultdict(set)
+    returns = {}
     EXTENSION_METHODS = set()
     syntax_errors = 0
     for path in files:
@@ -160,9 +191,11 @@ def run():
                 print("     строка %d: %s" % (line, text(src, err).strip()[:90].replace("\n", " ")))
         collect_types(src, tree.root_node, types)
         collect_extensions(src, tree.root_node, EXTENSION_METHODS)
+        collect_returns(src, tree.root_node, returns)
 
     static_checks = static_bad = 0
     member_checks = member_bad = 0
+    void_checks = void_bad = 0
     problems = []
 
     for path, (src, tree) in trees.items():
@@ -199,15 +232,55 @@ def run():
                                     % (os.path.relpath(path, ROOT), left.start_point[0] + 1,
                                        lname, rname, decl_type, lname))
 
+    # 3. результат void-метода нельзя присваивать или возвращать
+    for path, (src, tree) in trees.items():
+        for node in _walk(tree.root_node):
+            if node.type not in ("variable_declarator", "assignment_expression"):
+                continue
+            value = None
+            if node.type == "variable_declarator":
+                # у variable_declarator инициализатор — прямой потомок после «=»
+                # (у полей бывает equals_value_clause — учитываем оба вида)
+                for i, c in enumerate(node.children):
+                    if c.type == "=" and i + 1 < len(node.children):
+                        value = node.children[i + 1]
+                        break
+            else:
+                value = node.children[2] if len(node.children) > 2 else None
+            if value is None:
+                continue
+            call = None
+            for c in _walk(value):
+                if c.type == "invocation_expression":
+                    call = c
+                    break
+            if call is None:
+                continue
+            fn = call.children[0] if call.children else None
+            if fn is None or fn.type != "member_access_expression" or len(fn.children) < 3:
+                continue
+            left, right = fn.children[0], fn.children[2]
+            if left.type != "identifier":
+                continue
+            key = (text(src, left), text(src, right))
+            if key in returns and returns[key] == {"void"}:
+                void_checks += 1
+                void_bad += 1
+                problems.append("%s:%d  результат void-метода %s.%s(...) присвоен — так нельзя"
+                                % (os.path.relpath(path, ROOT), node.start_point[0] + 1, key[0], key[1]))
+            else:
+                void_checks += 1
+
     print("Файлов проверено: %d, с ошибками: %d" % (len(files), syntax_errors))
     print("типов: %d | проверено статических обращений: %d | проблем: %d"
           % (len(types), static_checks, static_bad))
     print("проверено обращений к компонентам: %d | проблем: %d" % (member_checks, member_bad))
+    print("проверено присваиваний результата вызова: %d | проблем: %d" % (void_checks, void_bad))
     if problems:
         print("\nНайдено:")
         for p in problems:
             print("   " + p)
-    return 1 if (syntax_errors or static_bad or member_bad) else 0
+    return 1 if (syntax_errors or static_bad or member_bad or void_bad) else 0
 
 
 def _errors(node):

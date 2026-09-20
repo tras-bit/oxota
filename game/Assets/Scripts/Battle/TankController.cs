@@ -39,6 +39,9 @@ namespace Samsar
         public int LootPicked;
         public bool Dead { get; private set; }
         public float HiddenUntil;              // до этого времени машина невидима (дым/маскировка)
+        public float DamageTakenMult = 1f;     // «Стальная стена»: временное снижение получаемого урона
+        public float TurboUntil;               // «Форсаж»: до этого времени скорость повышена
+        public static float RadarUntil;        // «Разведка»: до этого времени все противники видны
         float slowFactor = 1f, slowUntil;
         public bool RespawnAvailable { get; private set; }
         public float SurvivalTime;
@@ -141,7 +144,7 @@ namespace Samsar
             float speedMult = (armor != null ? armor.SpeedFactor : 1f) * slowFactor;
             float target = input.Throttle >= 0f ? input.Throttle * spec.maxSpeed
                                                 : input.Throttle * spec.reverseSpeed;
-            target *= speedMult * bonusSpeed;
+            target *= speedMult * bonusSpeed * (Time.time < TurboUntil ? 1.6f : 1f);
 
             Vector3 fwd = transform.forward;
             Vector3 vel = rb.velocity;

@@ -101,7 +101,9 @@ namespace Samsar
 
         static string RandomTankId()
         {
-            var r = TankSpec.Roster[Random.Range(0, TankSpec.Roster.Length)];
+            var roster = TankSpec.BotRoster;      // спецмашины — игроку, не ботам
+            if (roster.Length == 0) return TankSpec.Roster[0].id;
+            var r = roster[Random.Range(0, roster.Length)];
             return r.id;
         }
 
@@ -249,7 +251,7 @@ namespace Samsar
                     t.vision.SetRenderersVisible(true);
                     continue;
                 }
-                bool visible = !t.Dead && player.vision.CanSee(t);
+                bool visible = !t.Dead && (player.vision.CanSee(t) || Time.time < TankController.RadarUntil);
                 t.vision.VisibleToPlayer = visible;
                 t.vision.SetRenderersVisible(visible);
                 t.vision.CanSeePlayer = t.vision.CanSee(player);

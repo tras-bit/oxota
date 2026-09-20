@@ -136,7 +136,9 @@ namespace Samsar.EditorTools
             Directory.CreateDirectory(TankPrefabDir);
             foreach (var spec in TankSpec.Roster)
             {
-                var fbxPath = TankModelDir + "/" + spec.id + ".fbx";
+                // у спецмашин свой ключ (bastion/arlequin/raven), поэтому модель берём по modelName
+                string modelKey = string.IsNullOrEmpty(spec.modelName) ? spec.id : spec.modelName;
+                var fbxPath = TankModelDir + "/" + modelKey + ".fbx";
                 var model = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath);
                 if (model == null)
                 {
@@ -145,7 +147,7 @@ namespace Samsar.EditorTools
                 }
                 var instance = (GameObject)PrefabUtility.InstantiatePrefab(model);
                 instance.name = spec.id;
-                AssignMaterials(instance);
+                AssignMaterials(instance, CamoFor(spec.cls));
                 RemoveChildColliders(instance);
                 var prefabPath = TankPrefabDir + "/" + spec.id + ".prefab";
                 PrefabUtility.SaveAsPrefabAsset(instance, prefabPath);
@@ -159,14 +161,16 @@ namespace Samsar.EditorTools
             return AssetDatabase.LoadAssetAtPath<Material>(MatDir + "/" + name + ".mat");
         }
 
-        static string TankCamo(GameObject root)
+        /// <summary>Камуфляж по классу машины (у спецмашин ключ свой, имя FBX тут не подскажет).</summary>
+        static string CamoFor(TankClass cls)
         {
-            string id = root.name.ToLowerInvariant();
-            if (id.Contains("lt")) return "steel_olive";
-            if (id.Contains("mt")) return "steel_sand";
-            if (id.Contains("ht")) return "steel_grey";
-            if (id.Contains("td")) return "steel_green";
-            return "steel_olive";
+            switch (cls)
+            {
+                case TankClass.LT: return "steel_olive";
+                case TankClass.MT: return "steel_sand";
+                case TankClass.HT: return "steel_grey";
+                default: return "steel_green";
+            }
         }
 
         /// <summary>Подбирает наш материал по имени материала из FBX (регистр не важен).</summary>
@@ -192,9 +196,8 @@ namespace Samsar.EditorTools
             return null;
         }
 
-        static void AssignMaterials(GameObject root)
+        static void AssignMaterials(GameObject root, string camo)
         {
-            string camo = TankCamo(root);
             foreach (var r in root.GetComponentsInChildren<Renderer>())
             {
                 var list = new List<Material>();

@@ -10,7 +10,8 @@ namespace Samsar
     [System.Serializable]
     public class TankSpec
     {
-        public string id;               // lt / mt / ht / td
+        public string id;               // ключ машины: lt / mt / ht / td / bastion / arlequin / raven
+        public bool special;            // спецмашина: открыта сразу, отличается только характеристиками
         public string title;            // «ЛТ «Ветер»»
         public string modelName;        // имя FBX-модели в Assets/Models/Tanks
         public TankClass cls;
@@ -82,7 +83,53 @@ namespace Samsar
                 width = 3.3f, length = 7.0f, hullHeight = 1.15f,
                 caliber = 0.128f, ability2 = "camouflage", color = "#4d5a38"
             },
+        
+            // --- спецмашины: их три, доступны сразу, отличаются только характеристиками ---
+            new TankSpec {
+                id = "bastion", title = "ТТ «Бастион»", modelName = "ht", cls = TankClass.HT, special = true,
+                hp = 1400f, maxSpeed = 9.5f, reverseSpeed = 4.5f, accel = 3.8f, turnRate = 38f,
+                turretTraverse = 26f, reload = 6.2f, damage = 400f, penetration = 235f,
+                shellSpeed = 190f, dispersion = 0.46f, aimTime = 3.2f, viewRange = 320f,
+                armorHull = 118f, armorTurret = 160f, armorRear = 55f, shells = 18,
+                width = 4.1f, length = 7.4f, hullHeight = 1.20f,
+                caliber = 0.122f, ability2 = "shield", color = "#4f5a66"
+            },
+            new TankSpec {
+                id = "arlequin", title = "ЛТ «Арлекин»", modelName = "lt", cls = TankClass.LT, special = true,
+                hp = 700f, maxSpeed = 22f, reverseSpeed = 9f, accel = 9.5f, turnRate = 66f,
+                turretTraverse = 50f, reload = 2.2f, damage = 150f, penetration = 175f,
+                shellSpeed = 250f, dispersion = 0.40f, aimTime = 1.5f, viewRange = 400f,
+                armorHull = 35f, armorTurret = 45f, armorRear = 20f, shells = 36,
+                width = 2.9f, length = 5.6f, hullHeight = 0.95f,
+                caliber = 0.076f, ability2 = "turbo", color = "#7a6f3a"
+            },
+            new TankSpec {
+                id = "raven", title = "ПТ «Ворон»", modelName = "td", cls = TankClass.TD, special = true,
+                hp = 780f, maxSpeed = 8.5f, reverseSpeed = 4f, accel = 3.6f, turnRate = 34f,
+                turretTraverse = 22f, reload = 9f, damage = 600f, penetration = 330f,
+                shellSpeed = 300f, dispersion = 0.22f, aimTime = 3.4f, viewRange = 370f,
+                armorHull = 70f, armorTurret = 90f, armorRear = 35f, shells = 14,
+                width = 3.5f, length = 7.0f, hullHeight = 1.10f,
+                caliber = 0.128f, ability2 = "radar", color = "#3f4a44"
+            }
         };
+
+        /// <summary>Машины, на которых ездят боты и ИИ-напарник: спецмашины остаются игроку.</summary>
+        static TankSpec[] botRoster;
+        public static TankSpec[] BotRoster
+        {
+            get
+            {
+                if (botRoster == null)
+                {
+                    var list = new System.Collections.Generic.List<TankSpec>();
+                    foreach (var s in Roster) if (!s.special) list.Add(s);
+                    botRoster = list.ToArray();
+                }
+                return botRoster;
+            }
+        }
+
 
         public static TankSpec Get(string id)
         {

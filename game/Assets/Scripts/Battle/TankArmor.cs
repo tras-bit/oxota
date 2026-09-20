@@ -134,6 +134,8 @@ namespace Samsar
         public void DamageHull(float dmg)
         {
             if (dmg <= 0f) return;
+            if (tank != null) dmg *= tank.DamageTakenMult;   // «Стальная стена» и прочие защитные эффекты
+            if (dmg <= 0f) return;
             HullHp -= dmg;
             if (!tank.IsPlayer) return;
         }

@@ -58,20 +58,25 @@ namespace Samsar
             Place(subtitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -86f), new Vector2(1200f, 30f));
 
             // левая колонка — список машин
-            var left = MakePanel(canvas.transform, new Vector2(0f, 0.5f), new Vector2(36f, 0f), new Vector2(360f, 460f));
+            // высота левой колонки считается по числу машин, иначе список вылезает за панель
+            float listHeight = 120f + TankSpec.Roster.Length * 74f;
+            var left = MakePanel(canvas.transform, new Vector2(0f, 0.5f), new Vector2(36f, 0f),
+                                 new Vector2(360f, Mathf.Min(listHeight, 820f)));
             var leftTitle = MakeText(left, "МАШИНЫ", 24, TextAnchor.MiddleLeft, Accent);
             Place(leftTitle.rectTransform, new Vector2(0f, 1f), new Vector2(20f, -18f), new Vector2(280f, 30f));
             float y = -60f;
             for (int i = 0; i < TankSpec.Roster.Length; i++)
             {
                 int idx = i;
-                var b = MakeButton(left, TankSpec.Roster[i].title, new Vector2(0f, 1f),
+                string label = TankSpec.Roster[i].special ? "★ " + TankSpec.Roster[i].title
+                                                          : "   " + TankSpec.Roster[i].title;
+                var b = MakeButton(left, label, new Vector2(0f, 1f),
                                    new Vector2(16f, y), new Vector2(328f, 62f));
                 b.onClick.AddListener(() => SelectTank(idx));
                 tankButtons.Add(b);
                 y -= 74f;
             }
-            var hint = MakeText(left, "A/D, стрелки или клик — выбор машины\nEnter — в бой", 16,
+            var hint = MakeText(left, "A/D, стрелки или клик — выбор машины\nEnter — в бой\n★ — спецмашина: открыта сразу", 16,
                                 TextAnchor.UpperLeft, new Color(0.75f, 0.75f, 0.7f));
             Place(hint.rectTransform, new Vector2(0f, 0f), new Vector2(20f, 16f), new Vector2(320f, 60f));
 
@@ -125,7 +130,7 @@ namespace Samsar
             var spec = TankSpec.Roster[tankIndex];
             GameSession.TankId = spec.id;
 
-            if (tankName != null) tankName.text = spec.title;
+            if (tankName != null) tankName.text = (spec.special ? "★ " : "") + spec.title;
             if (tankStats != null)
                 tankStats.text = string.Format(
                     "Прочность: {0}\nСкорость: {1:0} км/ч\nОрудие: {2:0} мм / {3:0} урона\nПерезарядка: {4:0.0} с\n"
@@ -136,7 +141,8 @@ namespace Samsar
                 abilityText.text = "Умения:\n• авиаудар по области (обязательное)\n• " + AbilityTitle(spec.ability2) +
                                    "\n\nГабариты: " + spec.width.ToString("0.0") + " × " +
                                    spec.length.ToString("0.0") + " м, корпус " +
-                                   spec.hullHeight.ToString("0.0") + " м";
+                                   spec.hullHeight.ToString("0.0") + " м" +
+                                   (spec.special ? "\n\n★ спецмашина — доступна сразу" : "");
             if (spot != null) spot.color = ParseColor(spec.color);
 
             ShowModel(spec);

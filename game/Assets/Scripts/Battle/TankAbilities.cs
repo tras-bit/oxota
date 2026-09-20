@@ -48,6 +48,15 @@ namespace Samsar
                 case "camouflage":
                     a.title = "Маскировка"; a.cooldown = 55f; a.desc = "Полная невидимость на 8 секунд";
                     break;
+                case "shield":
+                    a.title = "Стальная стена"; a.cooldown = 80f; a.desc = "8 секунд урон снижен на 65%";
+                    break;
+                case "turbo":
+                    a.title = "Форсаж"; a.cooldown = 60f; a.desc = "+60% скорости на 8 секунд";
+                    break;
+                case "radar":
+                    a.title = "Разведка"; a.cooldown = 90f; a.desc = "12 секунд видны все противники на карте";
+                    break;
                 default:
                     a.title = id; a.cooldown = 60f; break;
             }
@@ -85,6 +94,9 @@ namespace Samsar
                 case "repair": DoRepair(); break;
                 case "fire_ring": StartCoroutine(FireRing()); break;
                 case "camouflage": StartCoroutine(Camouflage()); break;
+                case "shield": StartCoroutine(Shield()); break;
+                case "turbo": StartCoroutine(Turbo()); break;
+                case "radar": StartCoroutine(Radar()); break;
             }
             Sfx.Ability();
             if (tank.IsPlayer) HUD.Toast("Умение: " + a.title, HUD.ToastKind.Info);
@@ -171,6 +183,33 @@ namespace Samsar
                 yield return new WaitForSeconds(0.25f);
             }
             if (ring != null) Destroy(ring.gameObject);
+        }
+
+        IEnumerator Shield()
+        {
+            tank.DamageTakenMult = 0.35f;
+            HUD.Toast("Стальная стена: урон снижен на 65% (8 с)", HUD.ToastKind.Good);
+            // вспышки-искры по корпусу, пока держится броня
+            for (int i = 0; i < 4; i++)
+            {
+                Fx.Spawn(tank.transform.position + Vector3.up * 1f, 1.4f);
+                yield return new WaitForSeconds(2f);
+            }
+            tank.DamageTakenMult = 1f;
+        }
+
+        IEnumerator Turbo()
+        {
+            tank.TurboUntil = Time.time + 8f;
+            HUD.Toast("Форсаж: +60% скорости (8 с)", HUD.ToastKind.Good);
+            yield return new WaitForSeconds(8f);
+        }
+
+        IEnumerator Radar()
+        {
+            TankController.RadarUntil = Time.time + 12f;
+            HUD.Toast("Разведка: противники видны 12 секунд", HUD.ToastKind.Info);
+            yield return new WaitForSeconds(12f);
         }
 
         IEnumerator Camouflage()
