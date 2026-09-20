@@ -87,20 +87,31 @@ namespace Samsar.EditorTools
             // 1) ГОРОД (смешанная карта: город + лес + поля)
             var cityRoot = new GameObject("City").transform;
             cityRoot.SetParent(world, false);
+            // город стоит в центре карты: там же оказывается финальная зона (180 м),
+            // поэтому последний бой идёт в застройке, а не в чистом поле
             for (int bi = 0; bi < 5; bi++)
                 for (int bj = 0; bj < 5; bj++)
                 {
-                    float x = 120f + bi * 78f + (float)(rnd.NextDouble() * 14 - 7);
-                    float z = 120f + bj * 78f + (float)(rnd.NextDouble() * 14 - 7);
-                    if (rnd.NextDouble() < 0.18) continue;      // пустыри
+                    if (bi == 2 && bj == 2) continue;           // центральная площадь — место финала
+                    float x = -180f + bi * 90f + (float)(rnd.NextDouble() * 16 - 8);
+                    float z = -180f + bj * 90f + (float)(rnd.NextDouble() * 16 - 8);
+                    if (rnd.NextDouble() < 0.15) continue;      // пустыри
                     var go = SpawnProp(props, "house", new Vector3(x, 0f, z), (float)rnd.NextDouble() * 360f, terrain, cityRoot);
                     MarkDestructible(go, 900f, DestructibleProp.PropKind.Building, props, "rubble");
                 }
-            // пара снесённых домов — руины
+            // снесённые дома — руины по южной окраине города
             for (int i = 0; i < 6; i++)
             {
-                var pos = new Vector3(150f + i * 60f, 0f, 420f);
+                var pos = new Vector3(-150f + i * 60f, 0f, -280f);
                 SpawnProp(props, "rubble", pos, (float)rnd.NextDouble() * 360f, terrain, cityRoot);
+            }
+            // бетонные блоки и баррикады на центральной площади (укрытия для финала)
+            for (int i = 0; i < 10; i++)
+            {
+                float a = i / 10f * Mathf.PI * 2f;
+                var pos = new Vector3(Mathf.Cos(a) * 46f, 0f, Mathf.Sin(a) * 46f);
+                var go = SpawnProp(props, "block", pos, a * Mathf.Rad2Deg, terrain, cityRoot);
+                MarkDestructible(go, 700f, DestructibleProp.PropKind.Small, null, null);
             }
 
             // 2) ПРОМЗОНА: ангары (можно заехать внутрь) + контейнеры
@@ -108,8 +119,8 @@ namespace Samsar.EditorTools
             indRoot.SetParent(world, false);
             Vector3[] warehouses =
             {
-                new Vector3(430f, 0f, 200f), new Vector3(300f, 0f, 60f), new Vector3(120f, 0f, -120f),
-                new Vector3(760f, 0f, 640f), new Vector3(-150f, 0f, 520f)
+                new Vector3(430f, 0f, -160f), new Vector3(640f, 0f, 60f), new Vector3(340f, 0f, 330f),
+                new Vector3(880f, 0f, 720f), new Vector3(-430f, 0f, 500f)
             };
             foreach (var w in warehouses)
             {
@@ -118,7 +129,8 @@ namespace Samsar.EditorTools
             }
             for (int i = 0; i < 40; i++)
             {
-                var pos = new Vector3(Random.Range(-500f, 900f), 0f, Random.Range(-300f, 800f));
+                var pos = new Vector3(Random.Range(260f, 980f), 0f, Random.Range(-380f, 780f));
+                if (TerrainBuilder.DistanceToRoad(pos.x, pos.z) < 18f) continue;
                 var go = SpawnProp(props, "container", pos, Random.Range(0f, 360f), terrain, indRoot);
                 MarkDestructible(go, 1200f, DestructibleProp.PropKind.Container, null, null);
             }
@@ -135,16 +147,16 @@ namespace Samsar.EditorTools
             var railSource = new List<GameObject>();
             for (float x = -1450f; x <= 1450f; x += 25f)
             {
-                var go = SpawnProp(props, "rail_segment", new Vector3(x, 0f, -90f), 90f, terrain, railRoot);
+                var go = SpawnProp(props, "rail_segment", new Vector3(x, 0f, -420f), 90f, terrain, railRoot);
                 railSource.Add(go);
             }
-            for (float x = -1450f; x <= -450f; x += 25f)     // ветка к станции
+            for (float x = -1450f; x <= -450f; x += 25f)     // ветка к станции (она севернее города)
                 railSource.Add(SpawnProp(props, "rail_segment", new Vector3(x, 0f, 330f), 0f, terrain, railRoot));
             StaticBatcher.Combine(railSource, "RAILS_COMBINED", true);
 
             var stationRoot = new GameObject("Station").transform;
             stationRoot.SetParent(world, false);
-            SpawnProp(props, "station", new Vector3(-700f, 0f, 430f), 0f, terrain, stationRoot);
+            SpawnProp(props, "station", new Vector3(-700f, 0f, 348f), 0f, terrain, stationRoot);
             SpawnProp(props, "tower", new Vector3(-1000f, 0f, -400f), 0f, terrain, stationRoot);
             SpawnProp(props, "tower", new Vector3(1100f, 0f, 900f), 0f, terrain, stationRoot);
 
@@ -159,6 +171,8 @@ namespace Samsar.EditorTools
                 float z = Random.Range(-1300f, 1300f);
                 float density = Mathf.PerlinNoise(x / 380f, z / 380f);
                 if (density < 0.42f) continue;
+                if (TerrainBuilder.DistanceToRoad(x, z) < 24f) continue;      // не сажаем лес на асфальт
+                if (NearSpawnPoint(x, z, 34f)) continue;                       // просека у точки старта
                 string kind = Random.value < 0.6f ? "tree_spruce" : "tree_birch";
                 var tree = SpawnProp(props, kind, new Vector3(x, 0f, z), Random.Range(0f, 360f), terrain, forestRoot);
                 // дальний лес склеиваем в один меш (быстро рисуется), а деревья ближе 500 м к центру
@@ -178,6 +192,8 @@ namespace Samsar.EditorTools
                 for (int j = 0; j < 40; j++)
                 {
                     Vector3 p = c + new Vector3(Random.Range(-90f, 90f), 0f, Random.Range(-90f, 90f));
+                    if (TerrainBuilder.DistanceToRoad(p.x, p.z) < 24f) continue;
+                    if (NearSpawnPoint(p.x, p.z, 34f)) continue;
                     treeSource.Add(SpawnProp(props, Random.value < 0.5f ? "tree_spruce" : "tree_birch",
                                              p, Random.Range(0f, 360f), terrain, forestRoot));
                 }
@@ -191,17 +207,20 @@ namespace Samsar.EditorTools
             for (int i = 0; i < 160; i++)
             {
                 Vector3 p = RandomPoint(rnd, 1350f);
+                if (TerrainBuilder.DistanceToRoad(p.x, p.z) < 20f) continue;
                 var go = SpawnProp(props, "fence", p, (float)rnd.NextDouble() * 360f, terrain, smallRoot);
                 MarkDestructible(go, 260f, DestructibleProp.PropKind.Small, null, null);
             }
             for (int i = 0; i < 120; i++)
             {
                 Vector3 p = RandomPoint(rnd, 1300f);
+                if (TerrainBuilder.DistanceToRoad(p.x, p.z) < 20f) continue;
                 SpawnProp(props, "bale", p, (float)rnd.NextDouble() * 360f, terrain, smallRoot);
             }
             for (int i = 0; i < 80; i++)
             {
                 Vector3 p = RandomPoint(rnd, 1200f);
+                if (TerrainBuilder.DistanceToRoad(p.x, p.z) < 18f) continue;
                 var go = SpawnProp(props, "block", p, (float)rnd.NextDouble() * 360f, terrain, smallRoot);
                 MarkDestructible(go, 700f, DestructibleProp.PropKind.Small, null, null);
             }
@@ -301,18 +320,43 @@ namespace Samsar.EditorTools
             camGo.transform.position = new Vector3(0f, 12f, -18f);
         }
 
+        /// <summary>Точки старта по кольцу карты. Список считается один раз и используется ещё
+        /// при расстановке леса: вокруг каждой точки оставляем просеку, чтобы машина не застряла
+        /// между деревьями на старте.</summary>
+        public const int SpawnCount = 32;
+        public const float SpawnRadiusMin = 980f;
+        public const float SpawnRadiusStep = 130f;
+
+        public static Vector3[] SpawnPositions()
+        {
+            var arr = new Vector3[SpawnCount];
+            for (int i = 0; i < SpawnCount; i++)
+            {
+                float a = i / (float)SpawnCount * Mathf.PI * 2f;
+                float r = SpawnRadiusMin + (i % 3) * SpawnRadiusStep;
+                arr[i] = new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
+            }
+            return arr;
+        }
+
+        static bool NearSpawnPoint(float x, float z, float clearance)
+        {
+            foreach (var p in SpawnPositions())
+                if ((p - new Vector3(x, 0f, z)).sqrMagnitude < clearance * clearance)
+                    return true;
+            return false;
+        }
+
         static List<Transform> BuildSpawnPoints(BattleManager bm)
         {
             var list = new List<Transform>();
             var root = new GameObject("SpawnPoints").transform;
-            int n = 32;
-            for (int i = 0; i < n; i++)
+            var positions = SpawnPositions();
+            for (int i = 0; i < positions.Length; i++)
             {
-                float a = i / (float)n * Mathf.PI * 2f;
-                float r = 980f + (i % 3) * 130f;
                 var go = new GameObject("Spawn_" + i);
                 go.transform.SetParent(root, false);
-                go.transform.position = new Vector3(Mathf.Cos(a) * r, 4f, Mathf.Sin(a) * r);
+                go.transform.position = positions[i] + Vector3.up * 4f;
                 list.Add(go.transform);
             }
             return list;

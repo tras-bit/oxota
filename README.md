@@ -34,7 +34,8 @@ python3 tools/checks/run_all.py               # C# + модели FBX + комп
 Отдельно: `tools/checks/check_csharp.py` (синтаксис, связи типов, присваивание результата void-метода,
 число и типы аргументов, отсутствие API из Unity 2023+), `tools/checks/check_fbx.py`
 (оси, единицы, схлопнутые детали и габариты моделей), `tools/checks/assets.py` (все ли файлы,
-которые редакторские скрипты ищут по именам), `tools/balance_check.py` (таблицы дуэлей).
+которые редакторские скрипты ищут по именам), `tools/balance_check.py` (таблицы дуэлей),
+`tools/map_preview.py` (схема карты: дороги, город, промзона, лес, точки старта, круги зоны).
 Для разбора C# нужен `pip install tree_sitter tree_sitter_c_sharp`.
 
 ## Что в репозитории

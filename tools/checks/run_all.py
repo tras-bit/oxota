@@ -7,7 +7,8 @@
   1. check_csharp.py — синтаксис C# и связи между типами (опечатки в именах полей, переименования);
   2. check_fbx.py    — модели: оси, единицы, схлопнутые детали, габариты, материалы;
   3. assets.py       — наличие всех нужных ассетов (модели, текстуры, скрипты);
-  4. ../balance_check.py — таблицы дуэлей по числам из TankSpec.cs.
+  4. ../balance_check.py — таблицы дуэлей по числам из TankSpec.cs;
+  5. ../map_preview.py — схема карты (дороги, город, промзона, лес, точки старта, зоны).
 """
 import os
 import subprocess
@@ -37,6 +38,8 @@ def main():
     if os.path.exists(assets):
         results.append(("Ассеты проекта", run("Ассеты", [assets])))
     results.append(("Баланс", run("Баланс", [os.path.join(ROOT, "tools", "balance_check.py")])))
+    results.append(("Карта (схема и точки старта)",
+                    run("Карта", [os.path.join(ROOT, "tools", "map_preview.py")])))
 
     print("=" * 72)
     print("== ИТОГ")

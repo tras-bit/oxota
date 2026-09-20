@@ -9,6 +9,45 @@ namespace Samsar.EditorTools
     public static class TerrainBuilder
     {
         public const int SizeMeters = 3000;
+
+        /// <summary>Дорожная сеть по карте (мировые координаты XZ, terrain стоит в −1500…1500):
+        /// выезды по краям карты, шоссе через город и станцию, ветка в промзону.
+        /// Дороги красятся асфальтом и учитываются при расстановке объектов.</summary>
+        static readonly Vector2[][] Roads =
+        {
+            // запад → город → станция → восточный выезд (главное шоссе)
+            new[] { new Vector2(-1500f, 120f), new Vector2(-700f, 430f), new Vector2(450f, 540f),
+                    new Vector2(1200f, 480f), new Vector2(1500f, 430f) },
+            // город → промзона → южный выезд
+            new[] { new Vector2(450f, 540f), new Vector2(200f, -100f), new Vector2(-150f, -560f),
+                    new Vector2(-120f, -1500f) },
+            // разъезд в промзоне
+            new[] { new Vector2(200f, -100f), new Vector2(760f, 260f), new Vector2(1180f, 700f),
+                    new Vector2(1500f, 900f) },
+            // северный выезд от города
+            new[] { new Vector2(450f, 540f), new Vector2(700f, 1100f), new Vector2(900f, 1500f) },
+        };
+
+        /// <summary>Расстояние от точки мира до ближайшей дороги (метры). Нужно, чтобы не ставить
+        /// деревья, заборы и стога посреди асфальта.</summary>
+        public static float DistanceToRoad(float x, float z)
+        {
+            float best = float.MaxValue;
+            foreach (var road in Roads)
+                for (int i = 0; i + 1 < road.Length; i++)
+                    best = Mathf.Min(best, SegmentDistance(x, z, road[i], road[i + 1]));
+            return best;
+        }
+
+        static float SegmentDistance(float px, float pz, Vector2 a, Vector2 b)
+        {
+            float vx = b.x - a.x, vz = b.y - a.y;
+            float wx = px - a.x, wz = pz - a.y;
+            float len2 = vx * vx + vz * vz;
+            float t = len2 <= 0.0001f ? 0f : Mathf.Clamp01((wx * vx + wz * vz) / len2);
+            float dx = wx - vx * t, dz = wz - vz * t;
+            return Mathf.Sqrt(dx * dx + dz * dz);
+        }
         public const int HeightRes = 513;
         public const int AlphaRes = 1024;
 
@@ -43,8 +82,8 @@ namespace Samsar.EditorTools
                     h += Mathf.PerlinNoise((wx + ox) / 420f, (wz + oz) / 420f) * 0.14f;
                     h += Mathf.PerlinNoise((wx + ox) / 130f, (wz + oz) / 130f) * 0.05f;
 
-                    float cx = Mathf.Abs(fx - 0.65f), cz = Mathf.Abs(fz - 0.68f);   // площадка города
-                    float city = Mathf.Clamp01(1f - (cx + cz) * 6.5f);
+                    float cx = Mathf.Abs(fx - 0.5f), cz = Mathf.Abs(fz - 0.5f);     // площадка города — центр карты
+                    float city = Mathf.Clamp01(1f - (cx + cz) * 5.5f);
                     h = Mathf.Lerp(h, 0.46f, city * 0.85f);
 
                     heights[y, x] = Mathf.Clamp01(h * 0.55f);
@@ -103,11 +142,18 @@ namespace Samsar.EditorTools
                     float grass = Mathf.Clamp01(1f - rock - dirt) * Mathf.Clamp01(0.5f + patch);
                     float asphalt = 0f;
 
-                    // площадка станции и города — асфальт
-                    float city = Mathf.Clamp01(1f - (Mathf.Abs(fx - 0.65f) + Mathf.Abs(fz - 0.68f)) * 7f);
-                    float station = Mathf.Clamp01(1f - Mathf.Abs(fz - 0.47f) * 40f);
-                    asphalt = Mathf.Clamp01(city * 0.8f + station * 0.7f);
-                    grass *= (1f - asphalt);
+                    // площадка города (в центре) и полосы вдоль железной дороги — асфальт
+                    float city = Mathf.Clamp01(1f - (Mathf.Abs(fx - 0.5f) + Mathf.Abs(fz - 0.5f)) * 5.5f);
+                    float rail1 = Mathf.Clamp01(1f - Mathf.Abs(wz - 780f) / 40f);      // линия у станции: z = 330
+                    float rail2 = Mathf.Clamp01(1f - Mathf.Abs(wz - 1080f) / 40f);     // южная ветка: z = -420
+                    asphalt = Mathf.Clamp01(city * 0.85f + Mathf.Max(rail1, rail2) * 0.7f);
+
+                    // дороги: полотно 7 м в каждую сторону, обочина в 4 м уходит в грунт
+                    float roadDist = DistanceToRoad(wx - SizeMeters * 0.5f, wz - SizeMeters * 0.5f);
+                    float road = Mathf.Clamp01(1f - (roadDist - 7f) / 4f);
+                    asphalt = Mathf.Max(asphalt, road);
+                    dirt = Mathf.Max(dirt, Mathf.Clamp01(1f - (roadDist - 11f) / 5f) * 0.5f);
+                    grass *= (1f - Mathf.Clamp01(asphalt + dirt));
 
                     float sum = grass + dirt + rock + asphalt + 0.0001f;
                     map[y, x, 0] = grass / sum;
