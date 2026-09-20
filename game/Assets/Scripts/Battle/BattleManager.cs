@@ -75,6 +75,7 @@ namespace Samsar
             // противники: сначала «Мародёры» (слабые, идут за добычей), потом охотники-бойцы
             int total = Mathf.Clamp(GameSession.BotsInBattle, 4, Rules.MaxCombatants - 2);
             int marauders = Mathf.Clamp(GameSession.MaraudersInBattle, 0, total);
+            TankController pairMate = null;   // охотники сбиваются в взводы по два
             for (int i = 0; i < total; i++)
             {
                 bool isMarauder = i < marauders;
@@ -86,7 +87,12 @@ namespace Samsar
                     bot.abilities.AddCharge(1);   // мародёр уже успел награбить заряд умения
                 var ai = bot.gameObject.AddComponent<BotController>();
                 ai.Init(bot, isMarauder ? BotDifficulty.Marauder : DifficultyFor(i - marauders));
-                if (!isMarauder && i % 4 == 0) bot.vision.rangeMult = 1.15f;   // «главари» видят дальше
+                if (!isMarauder)
+                {
+                    if (i % 4 == 0) bot.vision.rangeMult = 1.15f;   // «главари» видят дальше
+                    if (pairMate != null) { BotSquad.Pair(pairMate, bot); pairMate = null; }
+                    else pairMate = bot;                             // взводы по две машины
+                }
             }
             HUD.Toast(string.Format("Бой начался: {0} машин ({1} мародёров), зона сужается",
                                     TankRegistry.All.Count, marauders), HUD.ToastKind.Info);

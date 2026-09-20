@@ -13,7 +13,8 @@ namespace Samsar
         public static BotDifficulty Difficulty = BotDifficulty.Normal;
         public static int SquadSize = 1;          // 1 = соло, 2 = взвод с ИИ-напарником
         public static bool SquadMateIsBot = true;
-        public static int BotsInBattle = 12;      // всего противников
+        public static int BotsInBattle = 29;      // всего противников: с игроком и напарником — 30+ машин
+        // (по анкете «30+ участников»; сверху ограничено Rules.MaxCombatants)
         // Из них «Мародёры» — отдельный тип: слабее стреляют, сначала идут за добычей,
         // подранками отступают, зато с них падает больше трофеев (по духу режима).
         public static int MaraudersInBattle = 6;

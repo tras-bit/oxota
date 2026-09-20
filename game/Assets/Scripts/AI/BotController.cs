@@ -271,6 +271,21 @@ namespace Samsar
 
             stuck = Mathf.Abs(Throttle) > 0.5f && tank.gameObject.GetComponent<Rigidbody>().velocity.magnitude < 0.5f;
             if (stuck) Steer = Random.value > 0.5f ? 1f : -1f;
+
+            // ПТ-САУ без башни: орудие ходит в секторе ±13° от корпуса, и пока корпус не
+            // развёрнут на цель, бот крутил бы стволом вхолостую и никогда не выстрелил.
+            if (!stuck && state == "бой" && target != null && !target.Dead &&
+                tank.rig != null && !tank.rig.HasTurret)
+            {
+                Vector3 toT = target.transform.position - transform.position;
+                toT.y = 0f;
+                float ang = Vector3.SignedAngle(transform.forward, toT.normalized, Vector3.up);
+                if (Mathf.Abs(ang) > 9f)
+                {
+                    Steer = Mathf.Clamp(ang / 25f, -1f, 1f);
+                    Throttle = 0.25f;   // медленно катимся, разворачиваясь
+                }
+            }
         }
 
         void AimAndShoot()
