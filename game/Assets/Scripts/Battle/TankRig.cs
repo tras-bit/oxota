@@ -11,6 +11,9 @@ namespace Samsar
         public Transform HullRoot { get; private set; }
         public Transform BodyRoot { get; private set; }     // качающаяся часть корпуса (подвеска)
         public Transform TurretPivot { get; private set; }
+
+        /// <summary>Есть ли вращающаяся башня. У ПТ-САУ рубка неподвижна — орудие в секторе.</summary>
+        public bool HasTurret { get; private set; }
         public Transform GunPivot { get; private set; }
         public Transform GunTip { get; private set; }
 
@@ -81,6 +84,7 @@ namespace Samsar
                 else if (ContainsAny(n, GearParts)) { gearList.Add(m); hullList.Add(m); }
                 else { bodyList.Add(m); hullList.Add(m); }
             }
+            HasTurret = turretList.Count > 0;
             if (turretList.Count == 0 && gunList.Count > 0)
             {   // ПТ-САУ без башни: орудие всё равно наводится по вертикали
                 TurretPivot.position = WorldBounds(gunList).center;
@@ -98,7 +102,7 @@ namespace Samsar
             foreach (var m in gearList)
             {
                 string n = m.name.ToLowerInvariant();
-                if (ContainsAny(n, SpinParts)) wheels.Add(new Wheel { t = m, r = WheelRadius(n) });
+                if (ContainsAny(n, SpinParts)) wheels.Add(new Wheel { t = m, r = WheelRadius(m, n) });
             }
 
             // качающаяся часть орудия: точка вращения — казённик
@@ -115,14 +119,34 @@ namespace Samsar
             gunRestLocal = GunPivot.localPosition;
 
             // ---- коллайдеры и зоны попадания ----
-            Bounds hull = WorldBoundsOf(HullRoot);
+            // Корпус считаем по деталям корпуса (без гусениц и башни), а хитбоксы гусениц — по самим
+            // лентам из модели: у корпуса низ уже гусениц, и по габариту корпуса хитбоксы уезжали мимо.
+            Bounds hull = bodyList.Count > 0 ? WorldBounds(bodyList) : WorldBoundsOf(HullRoot);
             AddBox(HullRoot, "hit_hull", hull.center, hull.size * 0.98f, ModuleType.Hull);
-            float halfW = Mathf.Max(0.6f, hull.extents.x);
+            var trackMesh = new List<Transform>();
+            foreach (var m in gearList)
+                if (m.name.ToLowerInvariant().Contains("_track")) trackMesh.Add(m);
             for (int s = -1; s <= 1; s += 2)
             {
-                Vector3 c = hull.center + new Vector3(s * (halfW + 0.05f), -hull.extents.y * 0.25f, 0f);
-                AddBox(HullRoot, "hit_tracks" + s, c,
-                       new Vector3(0.75f, hull.size.y * 0.5f, hull.size.z * 0.96f), ModuleType.Tracks);
+                Vector3 c;
+                Vector3 size;
+                if (trackMesh.Count > 0)
+                {
+                    var side = new List<Transform>();
+                    foreach (var m in trackMesh)
+                        if (s < 0 ? m.position.x < transform.position.x : m.position.x > transform.position.x)
+                            side.Add(m);
+                    var tb = side.Count > 0 ? WorldBounds(side) : hull;
+                    c = tb.center;
+                    size = new Vector3(Mathf.Max(0.5f, tb.size.x), hull.size.y * 0.7f, tb.size.z * 0.98f);
+                }
+                else
+                {
+                    float halfW = Mathf.Max(0.6f, hull.extents.x);
+                    c = hull.center + new Vector3(s * (halfW + 0.05f), -hull.extents.y * 0.25f, 0f);
+                    size = new Vector3(0.75f, hull.size.y * 0.5f, hull.size.z * 0.96f);
+                }
+                AddBox(HullRoot, "hit_tracks" + s, c, size, ModuleType.Tracks);
             }
             AddBox(HullRoot, "hit_engine",
                    hull.center - transform.forward * (hull.extents.z * 0.68f),
@@ -349,12 +373,22 @@ namespace Samsar
             return transform.position + Vector3.up * 1.5f;
         }
 
-        static float WheelRadius(string n)
+        /// <summary>Радиус катка для прокрутки: берём из габаритов самой детали модели,
+        /// иначе — типовая оценка. Иначе гусеница «проскальзывает» на классах с другими катками
+        /// (у ЛТ 0.34 м, у ТТ 0.42 м — одна константа не подходит всем).</summary>
+        static float WheelRadius(Transform t, string n)
         {
-            if (n.Contains("_roller")) return 0.14f;
+            var r = t.GetComponent<Renderer>();
+            if (r != null)
+            {
+                Vector3 size = r.bounds.size;
+                float d = Mathf.Max(Mathf.Min(size.y, size.z), 0.05f);   // каток — диск в плоскости YZ
+                if (d > 0.16f && d < 2.5f) return d * 0.5f;
+            }
+            if (n.Contains("_roller")) return 0.16f;
             if (n.Contains("_sprocket")) return 0.36f;
-            if (n.Contains("_idler")) return 0.34f;
-            return 0.42f;   // опорные катки
+            if (n.Contains("_idler")) return 0.30f;
+            return 0.40f;   // опорные катки
         }
 
         static bool ContainsAny(string name, string[] keys)

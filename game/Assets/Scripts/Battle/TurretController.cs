@@ -29,6 +29,17 @@ namespace Samsar
             if (dir.sqrMagnitude < 0.01f) return;
 
             Quaternion want = Quaternion.LookRotation(dir.normalized, Vector3.up);
+            if (!tank.rig.HasTurret)
+            {
+                // ПТ-САУ: рубки нет, орудие ходит только в узком секторе от корпуса (как у настоящей САУ)
+                Vector3 hullFwd = tank.transform.forward;
+                hullFwd.y = 0f;
+                float limit = 13f;
+                float ang = Vector3.SignedAngle(hullFwd, dir.normalized, Vector3.up);
+                float clamped = Mathf.Clamp(ang, -limit, limit);
+                want = Quaternion.LookRotation(Quaternion.AngleAxis(clamped, Vector3.up) * hullFwd.normalized,
+                                               Vector3.up);
+            }
             float speed = tank.spec.turretTraverse * traversedSpeedMult * (SniperMode ? 0.7f : 1f);
             tank.rig.TurretPivot.rotation = Quaternion.RotateTowards(
                 tank.rig.TurretPivot.rotation, want, speed * Time.deltaTime);
