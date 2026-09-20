@@ -15,7 +15,7 @@ namespace Samsar
         public bool SniperMode { get; private set; }
 
         float aimDistance = 300f;
-        float shareRepairTimer;
+        float shareRepairTimer, shareLootTimer;
 
         public static PlayerInput Attach(TankController t)
         {
@@ -67,6 +67,10 @@ namespace Samsar
             if (Input.GetKey(KeyCode.H)) ShareRepair();
             else shareRepairTimer = 0f;
 
+            // передача добычи напарнику: удерживать G рядом с союзником (снаряды и заряд умения)
+            if (Input.GetKey(KeyCode.G)) ShareLoot();
+            else shareLootTimer = 0f;
+
             if (Input.GetKeyDown(KeyCode.Tab)) HUD.ToggleStats();
             if (Input.GetKeyDown(KeyCode.Escape)) HUD.TogglePauseMenu();
         }
@@ -84,6 +88,36 @@ namespace Samsar
                 t.armor.RepairModules();
                 tank.armor.Heal(tank.armor.HullMax * 0.02f);
                 HUD.Toast("Ремонт передан напарнику", HUD.ToastKind.Good);
+            }
+        }
+
+        /// <summary>Отдать напарнику снаряды и заряд умения — взвод воюет как одно целое.</summary>
+        void ShareLoot()
+        {
+            shareLootTimer -= Time.deltaTime;
+            if (shareLootTimer > 0f) return;
+            shareLootTimer = 2f;
+            if (tank.abilities == null) return;
+            foreach (var t in TankRegistry.All)
+            {
+                if (!t.IsAlly || t.Dead) continue;
+                if (Vector3.Distance(t.transform.position, tank.transform.position) > 30f) continue;
+
+                int shells = Mathf.Min(6, Mathf.Max(0, tank.gun.Ammo - 4));
+                if (shells > 0) t.gun.AddAmmo(shells);
+
+                int charges = 0;
+                for (int i = 0; i < tank.abilities.abilities.Count && i < t.abilities.abilities.Count; i++)
+                {
+                    var mine = tank.abilities.abilities[i];
+                    var mate = t.abilities.abilities[i];
+                    if (mine.charges > 1 && mate.charges < mate.maxCharges) { mine.charges--; mate.charges++; charges++; }
+                }
+                if (shells > 0 || charges > 0)
+                    HUD.Toast(string.Format("Напарнику передано: {0} снаряд(ов), заряды умений: {1}",
+                                            shells, charges), HUD.ToastKind.Good);
+                else
+                    HUD.Toast("Передавать нечего — подбери добычу", HUD.ToastKind.Info);
             }
         }
     }

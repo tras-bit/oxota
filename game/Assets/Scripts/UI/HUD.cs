@@ -173,7 +173,7 @@ namespace Samsar
             speedText = MakeText(rootT, "0 км/ч", 16, TextAnchor.MiddleLeft,
                                  new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(300, 46),
                                  new Color(0.85f, 0.85f, 0.85f));
-            repairText = MakeText(rootT, "H — поделиться ремонтом с напарником", 14, TextAnchor.MiddleLeft,
+            repairText = MakeText(rootT, "H — ремонт напарнику · G — передать снаряды и заряды", 14, TextAnchor.MiddleLeft,
                                   new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(270, 20),
                                   new Color(0.7f, 0.75f, 0.8f));
         }

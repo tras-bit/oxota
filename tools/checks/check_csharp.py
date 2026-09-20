@@ -27,6 +27,13 @@ SRC_DIRS = [os.path.join(ROOT, "game", "Assets", "Scripts"),
             os.path.join(ROOT, "game", "Assets", "Editor")]
 
 # члены, которые могут прийти из базовых классов Unity — их отсутствие в нашем типе нормально
+# API, которых нет в Unity 2022.3.62f2 — в проект такого попадать не должно
+NEWER_UNITY_API = (
+    "FindObjectsByType", "FindFirstObjectByType", "FindAnyObjectByType", "Object.FindAnyObject",
+    "AudioRandomContainer", "Awaitable", "Physics.CapsuleCastNonAlloc2", "RenderMode.WorldSpace",
+    "EditorApplication.QueuePlayerLoopUpdateNow", "GraphicsFormat.R8G8B8A8_SRGB_Packed",
+)
+
 UNITY_MEMBERS = {
     "transform", "gameObject", "name", "tag", "enabled", "hideFlags", "GetComponent",
     "AddComponent", "GetComponentInChildren", "GetComponentsInChildren", "StartCoroutine",
@@ -256,6 +263,7 @@ def run():
         collect_returns(src, tree.root_node, returns)
         collect_param_counts(src, tree.root_node, param_counts, param_types)
 
+    api_checks = api_bad = 0
     static_checks = static_bad = 0
     member_checks = member_bad = 0
     void_checks = void_bad = 0
@@ -396,7 +404,23 @@ def run():
                     type_checks += 1
                 break
 
+    # 0. API новее целевой версии движка: в 2022.3 это не скомпилируется
+    for path, (src, tree) in trees.items():
+        for node in _walk(tree.root_node):
+            if node.type not in ("identifier", "member_access_expression"):
+                continue
+            piece = text(src, node)
+            for bad in NEWER_UNITY_API:
+                if piece == bad or piece.endswith("." + bad):
+                    api_checks += 1
+                    api_bad += 1
+                    problems.append("%s:%d  %s — этого API нет в Unity 2022.3"
+                                    % (os.path.relpath(path, ROOT), node.start_point[0] + 1, piece))
+                    break
+            api_checks += 1
+
     print("Файлов проверено: %d, с ошибками: %d" % (len(files), syntax_errors))
+    print("проверено имён API на совместимость с 2022.3: %d, проблем: %d" % (api_checks, api_bad))
     print("типов: %d | проверено статических обращений: %d | проблем: %d"
           % (len(types), static_checks, static_bad))
     print("проверено обращений к компонентам: %d | проблем: %d" % (member_checks, member_bad))
@@ -407,7 +431,7 @@ def run():
         print("\nНайдено:")
         for p in problems:
             print("   " + p)
-    return 1 if (syntax_errors or static_bad or member_bad or void_bad or arg_bad or type_bad) else 0
+    return 1 if (syntax_errors or static_bad or member_bad or void_bad or arg_bad or type_bad or api_bad) else 0
 
 
 def _errors(node):
