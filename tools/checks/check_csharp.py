@@ -326,6 +326,107 @@ def check_shadowing(src, tree, path, problems):
     return found
 
 
+def check_using_ambiguity(src, tree, path, problems):
+    """CS0104: голое имя, существующее сразу в двух подключённых пространствах имён.
+    Классика Unity: using System.Diagnostics (нужен Stopwatch) + using UnityEngine —
+    и голый Debug.Log становится двусмысленным (System.Diagnostics.Debug или UnityEngine.Debug?)."""
+    found = 0
+    usings, aliases = set(), set()
+    for node in _walk(tree.root_node):
+        t = text(src, node).strip()
+        if node.type == "using_directive":
+            # у using_directive нет поля name — разбираем текст: «using System.IO;».
+            # алиас «using Debug = UnityEngine.Debug;» тоже бывает узлом using_directive.
+            m = re.match(r"using\s+(?:static\s+)?([A-Za-z_]\w*)\s*=", t)
+            if m:
+                aliases.add(m.group(1))
+                continue
+            m = re.match(r"using\s+(?:static\s+)?([A-Za-z_][\w.]*)\s*;", t)
+            if m:
+                usings.add(m.group(1))
+        elif node.type == "using_alias_directive":
+            m = re.match(r"using\s+([A-Za-z_]\w*)\s*=", t)
+            if m:
+                aliases.add(m.group(1))
+    if "UnityEngine" not in usings:
+        return 0
+    PAIRS = (("Debug", "System.Diagnostics", "UnityEngine.Debug"),
+             ("Random", "System", "UnityEngine.Random"),
+             ("Object", "System", "UnityEngine.Object"))
+    for name, other, unity_full in PAIRS:
+        if other not in usings or name in aliases:
+            continue
+        for node in _walk(tree.root_node):
+            if node.type != "identifier" or text(src, node) != name:
+                continue
+            p = node.parent
+            if p is None or not p.children:
+                continue
+            # голое использование = имя — ПЕРВЫЙ сегмент обращения «Name.член»
+            # (UnityEngine.Debug здесь не попадает: у него Debug — второй сегмент)
+            if p.type not in ("member_access_expression", "qualified_name") \
+                    or p.children[0].start_byte != node.start_byte:
+                continue
+            q, inside_using = p, False
+            while q is not None:
+                if q.type in ("using_directive", "using_alias_directive"):
+                    inside_using = True
+                    break
+                q = q.parent
+            if inside_using:
+                continue
+            problems.append("%s:%d  %s. — двусмысленное имя (CS0104): подключены одновременно %s "
+                            "и UnityEngine; укажи точно (%s) или добавь псевдоним "
+                            "\"using %s = %s;\""
+                            % (os.path.relpath(path, ROOT), node.start_point[0] + 1, name,
+                               other, unity_full, name, unity_full))
+            found += 1
+            break
+    return found
+
+
+def check_ns_qualified(src, tree, path, problems, namespaces, ns_types):
+    """CS0234: ссылка «НашеПространство.Имя», где Имя в нём не объявлено.
+    Например, Samsar.MatchSunDirection, когда класс живёт в Samsar.EditorTools."""
+    found = 0
+    seen = set()
+    for node in _walk(tree.root_node):
+        if node.type not in ("qualified_name", "member_access_expression"):
+            continue
+        p = node.parent
+        # внутренние звенья цепочки a.b.c пропускаем — у них тот же start_byte,
+        # что и у корня цепочки, корень и проверим (узлы tree-sitter не стабильны
+        # по идентичности — сравниваем по позиции)
+        if p is not None and p.type in ("qualified_name", "member_access_expression") \
+                and p.start_byte == node.start_byte:
+            continue
+        if p is not None and p.type in ("using_directive", "using_alias_directive",
+                                        "namespace_declaration"):
+            continue
+        segs = re.sub(r"\s+", "", text(src, node)).split(".")
+        if len(segs) < 2 or not all(re.fullmatch(r"[A-Za-z_]\w*", s) for s in segs):
+            continue
+        best = None
+        for k in range(len(segs) - 1, 0, -1):        # самый длинный префикс-пространство имён
+            pref = ".".join(segs[:k])
+            if pref in namespaces:
+                best, nxt = pref, segs[k]
+                break
+        if best is None:                              # начинается не с нашего пространства имён
+            continue
+        if nxt in ns_types.get(best, ()) or (best + "." + nxt) in namespaces:
+            continue
+        if node.start_byte in seen:
+            continue
+        seen.add(node.start_byte)
+        problems.append("%s:%d  %s.%s — в пространстве имён %s такого нет (CS0234): "
+                        "класс объявлен в другом месте; проверь полный путь"
+                        % (os.path.relpath(path, ROOT), node.start_point[0] + 1,
+                           best, nxt, best))
+        found += 1
+    return found
+
+
 def run():
     files = []
     for d in SRC_DIRS:
@@ -362,6 +463,32 @@ def run():
             if k not in before and k not in NESTED_FILE:
                 NESTED_FILE[k] = path
 
+    # пространства имён проекта + типы верхнего уровня в них (для CS0234)
+    NAMESPACES = set()
+    NS_TYPES = defaultdict(set)
+
+    def scan_ns(node, ns_parts, src):
+        if node.type in ("namespace_declaration", "file_scoped_namespace_declaration"):
+            nm = node.child_by_field_name("name")
+            parts = list(ns_parts)
+            if nm is not None:
+                parts += re.sub(r"\s+", "", text(src, nm)).split(".")
+            for i in range(1, len(parts) + 1):
+                NAMESPACES.add(".".join(parts[:i]))
+            for c in node.children:
+                scan_ns(c, parts, src)
+            return
+        if node.type in TYPE_KINDS:
+            nm = node.child_by_field_name("name")
+            if ns_parts and nm is not None:
+                NS_TYPES[".".join(ns_parts)].add(text(src, nm))
+            return          # вложенные типы — члены типа, а не пространства имён
+        for c in node.children:
+            scan_ns(c, ns_parts, src)
+
+    for path, (src, tree) in trees.items():
+        scan_ns(tree.root_node, [], src)
+
     api_checks = api_bad = 0
     static_checks = static_bad = 0
     member_checks = member_bad = 0
@@ -371,12 +498,24 @@ def run():
     nested_checks = nested_bad = 0
     struct_checks = struct_bad = 0
     shadow_checks = shadow_bad = 0
+    amb_checks = amb_bad = 0
+    ns_checks = ns_bad = 0
     problems = []
 
     # CS0136/CS0128: скрытие имён локальных и параметров внутри метода
     for path, (src, tree) in trees.items():
         shadow_checks += 1
         shadow_bad += check_shadowing(src, tree, path, problems)
+
+    # CS0104: двусмысленные имена из-за пары using (классика — Debug при System.Diagnostics)
+    for path, (src, tree) in trees.items():
+        amb_checks += 1
+        amb_bad += check_using_ambiguity(src, tree, path, problems)
+
+    # CS0234: ссылка «НашеПространство.Имя», где Имя в нём не объявлено
+    for path, (src, tree) in trees.items():
+        ns_checks += 1
+        ns_bad += check_ns_qualified(src, tree, path, problems, NAMESPACES, NS_TYPES)
 
     for path, (src, tree) in trees.items():
         # 1. статические обращения Тип.Член
@@ -577,12 +716,16 @@ def run():
     print("проверено упоминаний вложенных типов: %d | проблем: %d" % (nested_checks, nested_bad))
     print("проверено изменений свойств структур-возвратов: %d | проблем: %d" % (struct_checks, struct_bad))
     print("проверено методов на скрытие имён (CS0136): %d | проблем: %d" % (shadow_checks, shadow_bad))
+    print("проверено файлов на двусмысленные имена (CS0104): %d | проблем: %d" % (amb_checks, amb_bad))
+    print("проверено файлов на ссылки в наши пространства имён (CS0234): %d | проблем: %d"
+          % (ns_checks, ns_bad))
     if problems:
         print("\nНайдено:")
         for p in problems:
             print("   " + p)
     return 1 if (syntax_errors or static_bad or member_bad or void_bad or arg_bad
-                or type_bad or api_bad or nested_bad or struct_bad or shadow_bad) else 0
+                or type_bad or api_bad or nested_bad or struct_bad or shadow_bad
+                or amb_bad or ns_bad) else 0
 
 
 def _errors(node):

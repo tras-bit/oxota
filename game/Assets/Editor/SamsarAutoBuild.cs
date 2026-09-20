@@ -6,6 +6,9 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+// using System.Diagnostics (нужен Stopwatch) делает голый Debug двусмысленным
+// (System.Diagnostics.Debug или UnityEngine.Debug?) — фиксируем явно:
+using Debug = UnityEngine.Debug;
 
 namespace Samsar.EditorTools
 {

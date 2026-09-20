@@ -59,7 +59,9 @@ namespace Samsar.EditorTools
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.75f;
             sunGo.transform.rotation = Quaternion.Euler(48f, 145f, 0f);
-            sunGo.AddComponent<Samsar.MatchSunDirection>();
+            // MatchSunDirection объявлен тут же, в Samsar.EditorTools — уточнять пространство
+            // имён не нужно (Samsar.MatchSunDirection искал бы класс прямо в Samsar — его там нет).
+            sunGo.AddComponent<MatchSunDirection>();
         }
 
         static Terrain BuildTerrain()
@@ -278,9 +280,14 @@ namespace Samsar.EditorTools
 
         static void MarkStatic(GameObject go)
         {
+            // NavigationStatic объявлен устаревшим (CS0618), но легаси-выпечка NavMesh
+            // по-прежнему читает его, а боты ходят по NavMeshAgent — оставляем и глушим
+            // предупреждение только здесь, чтобы Console была чистой.
+#pragma warning disable CS0618
             GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic |
                 StaticEditorFlags.NavigationStatic | StaticEditorFlags.OccludeeStatic |
                 StaticEditorFlags.OccluderStatic | StaticEditorFlags.ContributeGI);
+#pragma warning restore CS0618
         }
 
         static void MarkDestructible(GameObject go, float hp, DestructibleProp.PropKind kind,
