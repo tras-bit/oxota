@@ -99,6 +99,8 @@ namespace Samsar
             return r.id;
         }
 
+        int modelWarnings;
+
         Transform[] FallbackSpawns(int n)
         {
             var list = new List<Transform>();
@@ -125,10 +127,18 @@ namespace Samsar
             }
             else
             {
+                // Модели нет в библиотеке: играем дальше, но говорим игроку прямо, что случилось.
+                // (Так бывает, если префабы не собраны через Samsar → 0. СОБРАТЬ ВСЁ.)
                 go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 go.transform.localScale = new Vector3(3f, 1.2f, 6f);
                 go.transform.position = pos;
                 go.name = "Tank_fallback_" + callsign;
+                if (modelWarnings < 3)
+                {
+                    modelWarnings++;
+                    HUD.Toast("Модель «" + spec.id + "» не найдена — временная заглушка. " +
+                              "В Unity: Samsar → 0. СОБРАТЬ ВСЁ", ToastKind.Bad);
+                }
             }
             var rb = go.GetComponent<Rigidbody>();
             if (rb == null) rb = go.AddComponent<Rigidbody>();
