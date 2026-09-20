@@ -150,6 +150,7 @@ namespace Samsar.EditorTools
 
             // 4) ЛЕС (запад) + отдельные рощи — объединяются в крупные меши
             var treeSource = new List<GameObject>();
+            int nearTrees = 0;
             var forestRoot = new GameObject("Forest").transform;
             forestRoot.SetParent(world, false);
             for (int i = 0; i < 900; i++)
@@ -159,7 +160,17 @@ namespace Samsar.EditorTools
                 float density = Mathf.PerlinNoise(x / 380f, z / 380f);
                 if (density < 0.42f) continue;
                 string kind = Random.value < 0.6f ? "tree_spruce" : "tree_birch";
-                treeSource.Add(SpawnProp(props, kind, new Vector3(x, 0f, z), Random.Range(0f, 360f), terrain, forestRoot));
+                var tree = SpawnProp(props, kind, new Vector3(x, 0f, z), Random.Range(0f, 360f), terrain, forestRoot);
+                // дальний лес склеиваем в один меш (быстро рисуется), а деревья ближе 500 м к центру
+                // оставляем отдельными: их можно снести выстрелом, как заборы и дома
+                if (new Vector2(x, z).magnitude < 500f)
+                {
+                    // статическая батч-разметка не даст упавшему дереву поехать — снимаем её
+                    GameObjectUtility.SetStaticEditorFlags(tree, 0);
+                    MarkDestructible(tree, 170f, DestructibleProp.PropKind.Tree, null, null);
+                    nearTrees++;
+                }
+                else treeSource.Add(tree);
             }
             for (int i = 0; i < 4; i++)       // рощи в других частях карты
             {
@@ -172,6 +183,7 @@ namespace Samsar.EditorTools
                 }
             }
             StaticBatcher.Combine(treeSource, "TREES_COMBINED", true);
+            Debug.Log(string.Format("Лес: склеено {0}, отдельно разрушаемых деревьев {1}", treeSource.Count, nearTrees));
 
             // 5) ЗАБОРЫ, СТОГА И МЕЛОЧЬ ПО ВСЕЙ КАРТЕ
             var smallRoot = new GameObject("Details").transform;
