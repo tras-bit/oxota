@@ -10,7 +10,7 @@ tank_lib.py    ──► 4 модели   FBX ─► Assets/Models/Tanks/*.fbx �
 props_lib.py   ──► 13 объектов FBX ─► Assets/Models/Props/*.fbx ─► префабы ─┤
 make_textures.py ─► PBR 2К    ─────► Assets/Textures/*         ─► материалы ┤
                                                                             ▼
-                                              Samsar → 0. СОБРАТЬ ВСЁ (меню редактора)
+                                              SamsarAutoBuild (редактор сам при первом открытии; вручную — Samsar → 0)
                                                                             │
                         ┌───────────────────────────────────────────────────┤
                         ▼                                                   ▼
