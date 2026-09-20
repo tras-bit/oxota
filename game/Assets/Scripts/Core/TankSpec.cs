@@ -40,6 +40,7 @@ namespace Samsar
 
         public string ability2 = "repair";      // второе умение (первое — авиаудар у всех)
         public string color = "#5a6b45";
+        public float caliber = 0.100f;          // калибр, м — должен совпадать с моделями (tank_lib.py)
 
         public float SpeedKmh => maxSpeed * 3.6f;
 
@@ -52,7 +53,7 @@ namespace Samsar
                 shellSpeed = 240f, dispersion = 0.38f, aimTime = 1.7f, viewRange = 380f,
                 armorHull = 40f, armorTurret = 55f, armorRear = 25f, shells = 32,
                 width = 2.9f, length = 5.6f, hullHeight = 0.95f,
-                ability2 = "smoke", color = "#6d7b3f"
+                caliber = 0.076f, ability2 = "smoke", color = "#6d7b3f"
             },
             new TankSpec {
                 id = "mt", title = "СТ «Варяг»", modelName = "mt", cls = TankClass.MT,
@@ -61,7 +62,7 @@ namespace Samsar
                 shellSpeed = 220f, dispersion = 0.35f, aimTime = 2.2f, viewRange = 350f,
                 armorHull = 75f, armorTurret = 105f, armorRear = 40f, shells = 26,
                 width = 3.2f, length = 6.6f, hullHeight = 1.05f,
-                ability2 = "repair", color = "#8b7c4a"
+                caliber = 0.100f, ability2 = "repair", color = "#8b7c4a"
             },
             new TankSpec {
                 id = "ht", title = "ТТ «Гранит»", modelName = "ht", cls = TankClass.HT,
@@ -70,7 +71,7 @@ namespace Samsar
                 shellSpeed = 190f, dispersion = 0.42f, aimTime = 3.0f, viewRange = 330f,
                 armorHull = 100f, armorTurret = 145f, armorRear = 50f, shells = 20,
                 width = 3.9f, length = 7.4f, hullHeight = 1.20f,
-                ability2 = "fire_ring", color = "#5b6675"
+                caliber = 0.122f, ability2 = "fire_ring", color = "#5b6675"
             },
             new TankSpec {
                 id = "td", title = "ПТ «Гроза»", modelName = "td", cls = TankClass.TD,
@@ -79,7 +80,7 @@ namespace Samsar
                 shellSpeed = 260f, dispersion = 0.28f, aimTime = 3.4f, viewRange = 360f,
                 armorHull = 90f, armorTurret = 110f, armorRear = 40f, shells = 16,
                 width = 3.3f, length = 7.0f, hullHeight = 1.15f,
-                ability2 = "camouflage", color = "#4d5a38"
+                caliber = 0.128f, ability2 = "camouflage", color = "#4d5a38"
             },
         };
 

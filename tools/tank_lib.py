@@ -68,19 +68,20 @@ class TankSpec:
 
     @property
     def turret_half_w(self):
-        """Полуширина башни — считается от ширины машины, а не от корпуса."""
-        return min(self.width * 0.5 - self.track_w * 0.72, self.top_half_w + 0.30)
+        """Полуширина башни ≈ четверть ширины машины (чуть больше половины корпуса):
+        раньше башня выходила почти на всю ширину и выглядела плоским блином."""
+        return min(self.width * 0.5 - self.track_w * 0.92, self.top_half_w + 0.16)
 
 
 SPECS = {
     "lt": TankSpec("lt", "ЛТ «Ветер»", 5.6, 2.9, 0.95, "round", 5, 3.3, 0.076, "LT",
-                   camo="steel_olive", track_w=0.50, wheel_r=0.34, clearance=0.40, turret_h=0.74),
+                   camo="steel_olive", track_w=0.50, wheel_r=0.34, clearance=0.40, turret_h=0.80),
     "mt": TankSpec("mt", "СТ «Варяг»", 6.6, 3.2, 1.05, "hex", 6, 3.9, 0.100, "MT",
-                   camo="steel_sand", track_w=0.56, wheel_r=0.38, clearance=0.42, turret_h=0.78),
+                   camo="steel_sand", track_w=0.56, wheel_r=0.38, clearance=0.42, turret_h=0.86),
     "ht": TankSpec("ht", "ТТ «Гранит»", 7.4, 3.9, 1.20, "hex", 6, 4.3, 0.122, "HT",
-                   camo="steel_grey", track_w=0.68, wheel_r=0.42, clearance=0.44, turret_h=0.88),
+                   camo="steel_grey", track_w=0.68, wheel_r=0.42, clearance=0.44, turret_h=0.94),
     "td": TankSpec("td", "ПТ «Гроза»", 7.0, 3.3, 1.15, "casemate", 6, 5.1, 0.128, "TD",
-                   camo="steel_green", track_w=0.58, wheel_r=0.39, clearance=0.42, turret_h=0.72),
+                   camo="steel_green", track_w=0.58, wheel_r=0.39, clearance=0.42, turret_h=0.80),
 }
 
 
@@ -663,24 +664,28 @@ def build_turret(spec, mats):
     out.append(finish(spec.key + "_turret_optics", bm, mats["glass"], uv=0.8))
 
     # --- орудие
-    sleeve = 0.9
+    sleeve = 1.05
     y0 = front_y - 0.02
     bm = bmesh.new()
-    cyl(bm, (0, y0 + sleeve * 0.5, gun_z), spec.gun_cal * 1.15, sleeve, axis="Y", segments=18)
-    cyl(bm, (0, y0 + sleeve + 0.14, gun_z), spec.gun_cal * 0.72, 0.30, axis="Y", segments=16)
+    # казённая часть и кожух: у настоящих орудий ствол в 1.5–1.7 калибра у маски
+    cyl(bm, (0, y0 + sleeve * 0.5, gun_z), spec.gun_cal * 1.45, sleeve, axis="Y", segments=20)
+    cyl(bm, (0, y0 + sleeve + 0.16, gun_z), spec.gun_cal * 0.95, 0.34, axis="Y", segments=18)
     cyl(bm, (0, y0 + sleeve + (spec.gun_len - sleeve) * 0.5, gun_z),
-        spec.gun_cal * 0.60, spec.gun_len - sleeve, axis="Y", segments=18, radius2=spec.gun_cal * 0.50)
+        spec.gun_cal * 0.82, spec.gun_len - sleeve, axis="Y", segments=20,
+        radius2=spec.gun_cal * 0.62)
     if spec.gun_style == "long":                                                       # теплоизоляция
         cyl(bm, (0, y0 + sleeve + (spec.gun_len - sleeve) * 0.45, gun_z),
-            spec.gun_cal * 0.74, (spec.gun_len - sleeve) * 0.42, axis="Y", segments=16,
-            radius2=spec.gun_cal * 0.70)
+            spec.gun_cal * 1.00, (spec.gun_len - sleeve) * 0.46, axis="Y", segments=18,
+            radius2=spec.gun_cal * 0.92)
     out.append(finish(spec.key + "_gun", bm, mats["metal"], uv=0.8, smooth_angle=50))
 
     bm = bmesh.new()                                                                   # дульный тормоз
     tip_y = y0 + spec.gun_len
-    for i in range(2):
-        cyl(bm, (0, tip_y + 0.06 + i * 0.32, gun_z), spec.gun_cal * 1.15, 0.24, axis="Y", segments=16)
-    box(bm, (0, tip_y - 0.02, gun_z), (spec.gun_cal * 2.0, 0.16, 0.14), bevel=0.01)
+    cyl(bm, (0, tip_y + 0.16, gun_z), spec.gun_cal * 1.30, 0.46, axis="Y", segments=18)
+    for i in (0, 1):                                                                   # щели тормоза
+        box(bm, (0, tip_y + 0.05 + i * 0.22, gun_z), (spec.gun_cal * 3.0, 0.07, spec.gun_cal * 1.2),
+            bevel=0.0)
+    cyl(bm, (0, tip_y + 0.42, gun_z), spec.gun_cal * 0.72, 0.14, axis="Y", segments=16)  # срез канала
     out.append(finish(spec.key + "_muzzle", bm, mats["metal"], uv=0.6, smooth_angle=50))
     return out
 

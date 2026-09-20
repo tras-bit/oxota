@@ -68,7 +68,7 @@ namespace Samsar
             Shell.Fire(tank, origin, (dir + spread).normalized,
                        spec.damage * damageMult, spec.penetration, spec.shellSpeed, distance);
 
-            Fx.MuzzleFlash(origin, dir, spec.gun_caliber_placeholder());
+            Fx.MuzzleFlash(origin, dir, spec.caliber);
             Sfx.Shot(origin, spec.cls);
             Ammo--;
             ReloadLeft = ReloadTime;
@@ -76,21 +76,6 @@ namespace Samsar
             if (tank.rig != null) tank.rig.KickRecoil(1f);      // ствол уходит назад
             if (tank.IsPlayer) HUD.PunchCrosshair(recoilKick);
             return true;
-        }
-    }
-
-    internal static class GunSpecExt
-    {
-        /// <summary>Калибр для эффекта: берём из габаритов модели (упрощённо).</summary>
-        public static float gun_caliber_placeholder(this TankSpec s)
-        {
-            switch (s.cls)
-            {
-                case TankClass.LT: return 0.076f;
-                case TankClass.MT: return 0.100f;
-                case TankClass.HT: return 0.122f;
-                default: return 0.128f;
-            }
         }
     }
 }
