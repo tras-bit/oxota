@@ -417,10 +417,11 @@ namespace Samsar
             var rb = player.GetComponent<Rigidbody>();
             speedText.text = string.Format("{0:0} км/ч", rb != null ? rb.velocity.magnitude * 3.6f : 0f);
 
-            stateText.text = player.armor.TracksBroken ? "ГУСЕНИЦА СБИТА" :
-                             player.armor.EngineDamaged ? "ДВИГАТЕЛЬ ПОВРЕЖДЁН" :
-                             player.armor.GunDamaged ? "ОРУДИЕ ПОВРЕЖДЕНО" : "";
-            stateText.color = new Color(1f, 0.5f, 0.35f);
+            stateText.text = player.Stunned ? string.Format("ОГЛУШЕН · {0:0.0} с", player.StunnedUntil - Time.time)
+                           : player.armor.TracksBroken ? "ГУСЕНИЦА СБИТА"
+                           : player.armor.EngineDamaged ? "ДВИГАТЕЛЬ ПОВРЕЖДЁН"
+                           : player.armor.GunDamaged ? "ОРУДИЕ ПОВРЕЖДЕНО" : "";
+            stateText.color = player.Stunned ? new Color(1f, 0.85f, 0.3f) : new Color(1f, 0.5f, 0.35f);
         }
 
         void UpdateAbilities(TankController player)

@@ -138,6 +138,7 @@ namespace Samsar
                 float dmg = damage * Mathf.Clamp01(1f - d / radius);
                 t.ApplyRawDamage(dmg, tank);
                 t.ApplySlow(0.45f, stunTime);
+                t.ApplyStun(stunTime);        // ударная волна: экипаж в шоке
                 if (tank.IsPlayer) HUD.DamagePopup(t.transform.position + Vector3.up * 2.2f,
                                                    Mathf.RoundToInt(dmg), HUD.HitKind.Penetration);
                 if (!tank.IsPlayer) t.AddXp(dmg * Rules.XpDamage * 0.5f);

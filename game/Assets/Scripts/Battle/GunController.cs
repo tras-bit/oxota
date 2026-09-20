@@ -48,7 +48,8 @@ namespace Samsar
 
         void Update()
         {
-            if (ReloadLeft > 0f) ReloadLeft -= Time.deltaTime;
+            if (ReloadLeft > 0f)
+                ReloadLeft -= Time.deltaTime * (tank != null && tank.Stunned ? 0.5f : 1f);
         }
 
         public bool TryFire(Vector3 aimPoint)

@@ -40,6 +40,7 @@ namespace Samsar
         public bool Dead { get; private set; }
         public float HiddenUntil;              // до этого времени машина невидима (дым/маскировка)
         public float DamageTakenMult = 1f;     // «Стальная стена»: временное снижение получаемого урона
+        public float StunnedUntil;             // оглушение: экипаж не в форме (авиаудар, детонация БК)
         public float TurboUntil;               // «Форсаж»: до этого времени скорость повышена
         public static float RadarUntil;        // «Разведка»: до этого времени все противники видны
         float slowFactor = 1f, slowUntil;
@@ -107,6 +108,22 @@ namespace Samsar
         }
 
         /// <summary>Замедление/оглушение от умений и критов.</summary>
+        /// <summary>Оглушение: машина еле ползёт, орудие заряжается вдвое дольше, башня идёт медленнее.
+        /// Это отдельное состояние, а не «ещё одно замедление»: снаружи видно искры и надпись.</summary>
+        public void ApplyStun(float duration)
+        {
+            if (Dead || duration <= 0f) return;
+            float was = StunnedUntil;
+            StunnedUntil = Mathf.Max(StunnedUntil, Time.time + duration);
+            if (IsPlayer && was < Time.time)
+            {
+                HUD.Toast("Оглушены! Перезарядка и ход замедлены", HUD.ToastKind.Bad);
+                Sfx.Explosion(transform.position, 0.6f);   // глухой удар по корпусу
+            }
+        }
+
+        public bool Stunned => Time.time < StunnedUntil;
+
         public void ApplySlow(float factor, float duration)
         {
             slowFactor = Mathf.Min(slowFactor, Mathf.Clamp(factor, 0.05f, 1f));
@@ -144,7 +161,7 @@ namespace Samsar
             float speedMult = (armor != null ? armor.SpeedFactor : 1f) * slowFactor;
             float target = input.Throttle >= 0f ? input.Throttle * spec.maxSpeed
                                                 : input.Throttle * spec.reverseSpeed;
-            target *= speedMult * bonusSpeed * (Time.time < TurboUntil ? 1.6f : 1f);
+            target *= speedMult * bonusSpeed * (Time.time < TurboUntil ? 1.6f : 1f) * (Stunned ? 0.35f : 1f);
 
             Vector3 fwd = transform.forward;
             Vector3 vel = rb.velocity;

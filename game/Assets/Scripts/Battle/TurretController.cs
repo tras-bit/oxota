@@ -40,7 +40,8 @@ namespace Samsar
                 want = Quaternion.LookRotation(Quaternion.AngleAxis(clamped, Vector3.up) * hullFwd.normalized,
                                                Vector3.up);
             }
-            float speed = tank.spec.turretTraverse * traversedSpeedMult * (SniperMode ? 0.7f : 1f);
+            float speed = tank.spec.turretTraverse * traversedSpeedMult * (SniperMode ? 0.7f : 1f)
+                          * (tank.Stunned ? 0.55f : 1f);
             tank.rig.TurretPivot.rotation = Quaternion.RotateTowards(
                 tank.rig.TurretPivot.rotation, want, speed * Time.deltaTime);
 

@@ -91,6 +91,67 @@ def collect_types(src, node, out):
         collect_types(src, child, out)
 
 
+NUMERIC = ("int", "uint", "long", "ulong", "short", "ushort", "byte", "sbyte",
+           "float", "double", "decimal")
+
+
+def param_type_name(src, prm):
+    """Имя типа параметра: bool / int / float / TankSpec / Vector3 …"""
+    for c in prm.children:
+        if c.type in ("predefined_type", "identifier", "qualified_name", "generic_name"):
+            return text(src, c).split("<")[0].split(".")[-1].strip()
+    return ""
+
+
+def literal_kind(src, arg):
+    """Вид литерала в аргументе: число / логическое / строка / иначе None."""
+    for c in arg.children:
+        if c.type in ("integer_literal", "real_literal"):
+            return "number"
+        if c.type == "boolean_literal":
+            return "bool"
+        if c.type in ("string_literal", "interpolated_string_expression", "character_literal"):
+            return "string"
+        if c.type in ("identifier", "invocation_expression", "member_access_expression",
+                      "binary_expression", "parenthesized_expression", "object_creation_expression",
+                      "cast_expression", "null_literal", "conditional_expression", "prefix_unary_expression",
+                      "element_access_expression", "implicit_object_creation_expression"):
+            return None
+    return None
+
+
+def collect_param_counts(src, node, out, types_out):
+    """out[(ИмяТипа, ИмяМетода)] = набор вариантов числа параметров (перегрузки дают несколько)."""
+    for child in node.children:
+        if child.type in TYPE_KINDS:
+            name_node = child_of_kind(child, "identifier")
+            if name_node is not None:
+                tname = text(src, name_node)
+                for m in _walk(child):
+                    if m.type != "method_declaration":
+                        continue
+                    nm = _member_name(src, m)
+                    params = child_of_kind(m, "parameter_list")
+                    if not nm or params is None:
+                        continue
+                    total = required = 0
+                    types_row = []
+                    for prm in params.children:
+                        if prm.type != "parameter":
+                            continue
+                        total += 1
+                        types_row.append(param_type_name(src, prm))
+                        # параметр со значением по умолчанию можно не передавать
+                        # (в грамматике это узел "=" внутри parameter)
+                        has_default = any(c.type == "=" or c.type == "equals_value_clause"
+                                          for c in prm.children)
+                        if not has_default:
+                            required += 1
+                    out.setdefault((tname, nm), []).append((required, total))
+                    types_out.setdefault((tname, nm), []).append(types_row)
+        collect_param_counts(src, child, out, types_out)
+
+
 def collect_returns(src, node, out):
     """Возвращаемый тип методов: out[(ИмяТипа, ИмяМетода)] = набор типов («void», «ParticleSystem»…).
     Нужно, чтобы ловить «присваивание результата void-метода» — ошибка компиляции,
@@ -177,6 +238,7 @@ def run():
     parser = Parser(Language(tscs.language()))
     trees, types = {}, defaultdict(set)
     returns = {}
+    param_counts, param_types = {}, {}
     EXTENSION_METHODS = set()
     syntax_errors = 0
     for path in files:
@@ -192,10 +254,13 @@ def run():
         collect_types(src, tree.root_node, types)
         collect_extensions(src, tree.root_node, EXTENSION_METHODS)
         collect_returns(src, tree.root_node, returns)
+        collect_param_counts(src, tree.root_node, param_counts, param_types)
 
     static_checks = static_bad = 0
     member_checks = member_bad = 0
     void_checks = void_bad = 0
+    arg_checks = arg_bad = 0
+    type_checks = type_bad = 0
     problems = []
 
     for path, (src, tree) in trees.items():
@@ -271,16 +336,78 @@ def run():
             else:
                 void_checks += 1
 
+    # 4. число аргументов вызова должно совпадать с числом параметров метода
+    for path, (src, tree) in trees.items():
+        for node in _walk(tree.root_node):
+            if node.type != "invocation_expression" or len(node.children) < 2:
+                continue
+            fn, args = node.children[0], node.children[1]
+            if fn.type != "member_access_expression" or len(fn.children) < 3:
+                continue
+            left, right = fn.children[0], fn.children[2]
+            if left.type != "identifier" or right.type != "identifier":
+                continue
+            key = (text(src, left), text(src, right))
+            if key not in param_counts:
+                continue
+            passed = sum(1 for c in args.children if c.type == "argument")
+            arg_checks += 1
+            ok = any(req <= passed <= total for req, total in param_counts[key])
+            if not ok:
+                arg_bad += 1
+                variants = " или ".join("%d..%d" % (req, total) if req != total else str(total)
+                                        for req, total in sorted(set(param_counts[key])))
+                problems.append("%s:%d  %s.%s(...) — передано аргументов %d, а метод ждёт %s"
+                                % (os.path.relpath(path, ROOT), node.start_point[0] + 1,
+                                   key[0], key[1], passed, variants))
+
+    # 5. очевидные несовпадения типов аргументов-литералов (число там, где ждут bool, и наоборот)
+    for path, (src, tree) in trees.items():
+        for node in _walk(tree.root_node):
+            if node.type != "invocation_expression" or len(node.children) < 2:
+                continue
+            fn, args = node.children[0], node.children[1]
+            if fn.type != "member_access_expression" or len(fn.children) < 3:
+                continue
+            left, right = fn.children[0], fn.children[2]
+            if left.type != "identifier" or right.type != "identifier":
+                continue
+            key = (text(src, left), text(src, right))
+            if key not in param_types:
+                continue
+            arg_nodes = [c for c in args.children if c.type == "argument"]
+            for variant, row in zip(param_counts[key], param_types[key]):
+                if not (variant[0] <= len(arg_nodes) <= variant[1]):
+                    continue
+                for i, arg in enumerate(arg_nodes):
+                    if i >= len(row):
+                        break
+                    kind, ptype = literal_kind(src, arg), row[i]
+                    wrong = None
+                    if ptype == "bool" and kind == "number":
+                        wrong = "число вместо true/false"
+                    elif ptype in NUMERIC and kind in ("bool", "string"):
+                        wrong = ("true/false" if kind == "bool" else "строка") + " вместо числа"
+                    if wrong:
+                        type_bad += 1
+                        problems.append("%s:%d  %s.%s(...), аргумент %d: %s (ждёт %s)"
+                                        % (os.path.relpath(path, ROOT), arg.start_point[0] + 1,
+                                           key[0], key[1], i + 1, wrong, ptype))
+                    type_checks += 1
+                break
+
     print("Файлов проверено: %d, с ошибками: %d" % (len(files), syntax_errors))
     print("типов: %d | проверено статических обращений: %d | проблем: %d"
           % (len(types), static_checks, static_bad))
     print("проверено обращений к компонентам: %d | проблем: %d" % (member_checks, member_bad))
     print("проверено присваиваний результата вызова: %d | проблем: %d" % (void_checks, void_bad))
+    print("проверено вызовов с проверкой числа аргументов: %d | проблем: %d" % (arg_checks, arg_bad))
+    print("проверено типов аргументов-литералов: %d | проблем: %d" % (type_checks, type_bad))
     if problems:
         print("\nНайдено:")
         for p in problems:
             print("   " + p)
-    return 1 if (syntax_errors or static_bad or member_bad or void_bad) else 0
+    return 1 if (syntax_errors or static_bad or member_bad or void_bad or arg_bad or type_bad) else 0
 
 
 def _errors(node):

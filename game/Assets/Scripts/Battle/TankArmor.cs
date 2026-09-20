@@ -125,6 +125,7 @@ namespace Samsar
                     if (res.critical)
                     {
                         if (tank != null && tank.gun != null) tank.gun.reloadPenalty = 1.5f;
+                        if (tank != null) tank.ApplyStun(2.5f);         // детонация БК: экипаж контужен
                         if (tank.IsPlayer) HUD.Toast("Детонация БК: перезарядка длиннее", HUD.ToastKind.Bad);
                     }
                     break;
