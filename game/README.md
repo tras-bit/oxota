@@ -66,8 +66,7 @@ Assets/Models/                модели техники и объектов (�
 ## Проверки без Unity
 
 ```
-python3 tools/checks/check_csharp.py   # синтаксис всех C# и связи между типами (запуск из корня репозитория)
-python3 tools/balance_check.py         # таблицы дуэлей по числам из TankSpec.cs
+python3 tools/checks/run_all.py        # всё сразу: C#, модели FBX, ассеты, баланс (запуск из корня репозитория)
 ```
 
 ## Проверка баланса без запуска игры

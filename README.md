@@ -24,10 +24,14 @@ tools/blender.sh tools/make_textures.py      # 51 файл PBR-текстур 2�
 tools/blender.sh tools/build_models.py all   # 4 машины + 13 объектов окружения + рендеры
 tools/blender.sh tools/tank_preview.py mt    # быстрые рендеры одной машины с трёх ракурсов
 
-# 4. Проверки без Unity (движка в песочнице нет)
-python3 tools/checks/check_csharp.py         # синтаксис и связи типов в C#-скриптах игры
-python3 tools/balance_check.py               # таблицы «кто кого за сколько убивает»
+# 4. Проверки без Unity (движка в песочнице нет) — одним запуском
+python3 tools/checks/run_all.py               # C# + модели FBX + комплектность ассетов + баланс
 ```
+
+Отдельно: `tools/checks/check_csharp.py` (синтаксис и связи типов в C#), `tools/checks/check_fbx.py`
+(оси, единицы, схлопнутые детали и габариты моделей), `tools/checks/assets.py` (все ли файлы,
+которые редакторские скрипты ищут по именам), `tools/balance_check.py` (таблицы дуэлей).
+Для разбора C# нужен `pip install tree_sitter tree_sitter_c_sharp`.
 
 ## Что в репозитории
 
