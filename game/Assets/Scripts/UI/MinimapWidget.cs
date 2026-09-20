@@ -14,7 +14,7 @@ namespace Samsar
         RectTransform root;
         readonly Dictionary<TankController, Image> tankMarkers = new Dictionary<TankController, Image>();
         readonly List<Marker> tempMarkers = new List<Marker>();
-        Sprite ring, dot, square;
+        Sprite ring, dot, square, arrow;
         Font font;
 
         class Marker
@@ -25,7 +25,7 @@ namespace Samsar
             public Color color;
         }
 
-        public void Build(Transform canvas, Font f)
+        public void Build(Transform canvas, Font f, Texture2D mapBg = null)
         {
             font = f;
             var go = new GameObject("Minimap");
@@ -36,9 +36,20 @@ namespace Samsar
             root.anchoredPosition = new Vector2(-24, 24);
             root.sizeDelta = new Vector2(Size, Size);
 
-            bg = NewImage(root, new Color(0.07f, 0.09f, 0.1f, 0.82f), new Vector2(Size, Size), Vector2.zero);
+            bg = NewImage(root, new Color(0.07f, 0.09f, 0.1f, 0.92f), new Vector2(Size, Size), Vector2.zero);
+
+            // подложка: дороги, город, промзона, железная дорога, лес — совпадает с миром
+            if (mapBg != null)
+            {
+                var map = NewImage(root, Color.white, new Vector2(Size, Size), Vector2.zero);
+                map.sprite = Sprite.Create(mapBg, new Rect(0f, 0f, mapBg.width, mapBg.height),
+                                           new Vector2(0.5f, 0.5f));
+                map.type = Image.Type.Simple;
+            }
+
             dot = MakeCircleSprite(16, false);
             square = MakeSquareSprite();
+            arrow = MakeTriangleSprite();
             ring = MakeCircleSprite(128, true);
 
             zoneImage = NewImage(root, new Color(1f, 0.85f, 0.2f, 0.55f), new Vector2(100, 100), Vector2.zero);
@@ -50,6 +61,8 @@ namespace Samsar
 
             var label = NewText(root, "Карта 3×3 км", 13, new Vector2(Size * 0.5f, -14f), Color.white);
             label.alignment = TextAnchor.MiddleCenter;
+            var north = NewText(root, "С", 13, new Vector2(Size * 0.5f, Size - 16f), new Color(1f, 1f, 1f, 0.75f));
+            north.alignment = TextAnchor.MiddleCenter;
         }
 
         Image NewImage(Transform parent, Color c, Vector2 size, Vector2 pos)
@@ -110,6 +123,27 @@ namespace Samsar
             return Sprite.Create(tex, new Rect(0, 0, 8, 8), new Vector2(0.5f, 0.5f));
         }
 
+        /// <summary>Стрелка «куда смотрит танк» для маркера игрока: остриё вверх (+V).</summary>
+        static Sprite MakeTriangleSprite()
+        {
+            const int R = 24;
+            var tex = new Texture2D(R, R, TextureFormat.RGBA32, false);
+            var px = new Color[R * R];
+            for (int y = 0; y < R; y++)
+                for (int x = 0; x < R; x++)
+                {
+                    // треугольник: вершина сверху по центру, основание внизу
+                    float t = y / (float)(R - 1);                    // 0 внизу → 1 наверху
+                    float halfW = Mathf.Lerp(0.42f, 0.08f, t) * R;   // внизу шире
+                    float a = Mathf.Abs(x + 0.5f - R * 0.5f) <= halfW ? 1f : 0f;
+                    px[y * R + x] = new Color(1f, 1f, 1f, a);
+                }
+            tex.SetPixels(px);
+            tex.Apply();
+            tex.wrapMode = TextureWrapMode.Clamp;
+            return Sprite.Create(tex, new Rect(0, 0, R, R), new Vector2(0.5f, 0.5f));
+        }
+
         public static void MarkAirDrop(Vector3 pos) { if (HUD.Instance != null) HUD.Instance.GetComponent<MinimapWidget>().AddMark(pos, new Color(0.2f, 0.8f, 1f), 300f); }
         public static void MarkAbility(Vector3 pos) { if (HUD.Instance != null) HUD.Instance.GetComponent<MinimapWidget>().AddMark(pos, new Color(1f, 0.4f, 0.2f), 8f); }
 
@@ -149,12 +183,17 @@ namespace Samsar
                 {
                     marker.color = new Color(0.4f, 0.4f, 0.4f, 0.5f);
                 }
-                else if (t.IsPlayer) marker.color = new Color(1f, 0.9f, 0.3f);
+                else if (t.IsPlayer)
+                {
+                    marker.color = new Color(1f, 0.9f, 0.3f);
+                    marker.sprite = arrow;                          // стрелка: куда смотрит танк
+                    marker.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -t.transform.eulerAngles.y);
+                }
                 else if (t.IsAlly) marker.color = new Color(0.4f, 1f, 0.5f);
                 else marker.color = t.vision != null && t.vision.VisibleToPlayer ? new Color(1f, 0.35f, 0.3f)
                                                                                  : new Color(0f, 0f, 0f, 0f);
+                if (!t.IsPlayer) marker.rectTransform.localRotation = Quaternion.identity;
                 marker.rectTransform.anchoredPosition = ToMap(t.transform.position);
-                marker.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -t.transform.eulerAngles.y);
             }
 
             for (int i = tempMarkers.Count - 1; i >= 0; i--)

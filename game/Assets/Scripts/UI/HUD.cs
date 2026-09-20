@@ -11,6 +11,10 @@ namespace Samsar
         public enum ToastKind { Info, Good, Bad }
         public enum HitKind { Penetration, Bounce }
 
+        /// <summary>Подложка миникарты (дороги/город/лес), рисуется при сборке сцены.
+        /// Пустая — если сцена собрана старой версией генератора.</summary>
+        public Texture2D minimapBg;
+
         public static HUD Instance;
 
         Canvas canvas;
@@ -63,7 +67,7 @@ namespace Samsar
             BuildKillFeed();
             BuildPanels();
             minimap = gameObject.AddComponent<MinimapWidget>();
-            minimap.Build(canvas.transform, font);
+            minimap.Build(canvas.transform, font, minimapBg);
             HUD.Toast("Бой начался. Цель: выжить любой ценой", ToastKind.Info);
         }
 

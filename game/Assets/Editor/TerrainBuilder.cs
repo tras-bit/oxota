@@ -209,7 +209,18 @@ namespace Samsar.EditorTools
         public static void PlaceOnGround(GameObject go, Terrain terrain, float extraY = 0f)
         {
             Vector3 p = go.transform.position;
-            bool inside = p.x >= 0 && p.x <= SizeMeters && p.z >= 0 && p.z <= SizeMeters;
+            // Террейн стоит в мире от −SizeMeters/2 до +SizeMeters/2 (позиция −1500,−1500).
+            // Раньше граница проверялась как 0…SizeMeters — и вся западная и южная
+            // половина карты (включая полгорода) получала фиксированную высоту 0:
+            // дома тонули в рельефе. Считаем по реальной позиции террейна.
+            float minX = -SizeMeters * 0.5f, minZ = -SizeMeters * 0.5f;
+            if (terrain != null)
+            {
+                minX = terrain.transform.position.x;
+                minZ = terrain.transform.position.z;
+            }
+            bool inside = p.x >= minX && p.x <= minX + SizeMeters &&
+                          p.z >= minZ && p.z <= minZ + SizeMeters;
             p.y = inside ? HeightAt(terrain, p) + extraY : extraY;
             go.transform.position = p;
         }

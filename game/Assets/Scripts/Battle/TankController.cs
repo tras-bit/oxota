@@ -315,7 +315,7 @@ namespace Samsar
             gun.RefillAmmo();
             rig.SetBurning(false);
             rig.ResetVisuals();
-            rb.position = position + Vector3.up * 1f;
+            rb.position = new Vector3(position.x, BattleManager.GroundY(position) + 1f, position.z);
             rb.velocity = Vector3.zero;
             transform.rotation = Quaternion.Euler(0f, Random.value * 360f, 0f);
             Fx.Spawn(position, 1.2f);

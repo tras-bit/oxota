@@ -28,7 +28,7 @@ namespace Samsar.EditorTools
             SetupLighting();
             var terrain = BuildTerrain();
             BuildWorld(terrain);
-            BuildControllers();
+            BuildControllers(terrain);
             BakeNavMesh();
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -311,7 +311,7 @@ namespace Samsar.EditorTools
         }
 
         // ---------- менеджеры, HUD, камера ----------
-        static void BuildControllers()
+        static void BuildControllers(Terrain terrain)
         {
             var managers = new GameObject("BattleSystems");
             var zone = managers.AddComponent<ZoneController>();
@@ -321,7 +321,7 @@ namespace Samsar.EditorTools
             var bm = managers.AddComponent<BattleManager>();
             bm.zone = zone;
             bm.loot = loot;
-            bm.spawnPoints = BuildSpawnPoints(bm).ToArray();
+            bm.spawnPoints = BuildSpawnPoints(terrain).ToArray();
 
             var libGo = new GameObject("TankLibrary");
             var lib = libGo.AddComponent<TankLibrary>();
@@ -335,7 +335,8 @@ namespace Samsar.EditorTools
             bm.library = lib;
 
             var hudGo = new GameObject("HUD");
-            hudGo.AddComponent<HUD>();
+            var hud = hudGo.AddComponent<HUD>();
+            hud.minimapBg = BuildMinimapTexture();
 
             var camGo = new GameObject("MainCamera");
             Samsar.TankRig.SafeTag(camGo, "MainCamera");
@@ -376,7 +377,7 @@ namespace Samsar.EditorTools
             return false;
         }
 
-        static List<Transform> BuildSpawnPoints(BattleManager bm)
+        static List<Transform> BuildSpawnPoints(Terrain terrain)
         {
             var list = new List<Transform>();
             var root = new GameObject("SpawnPoints").transform;
@@ -385,10 +386,80 @@ namespace Samsar.EditorTools
             {
                 var go = new GameObject("Spawn_" + i);
                 go.transform.SetParent(root, false);
-                go.transform.position = positions[i] + Vector3.up * 4f;
+                // высоту берём с рельефа: раньше точки висели на Y=4 при поверхности +5…+25,
+                // и танки рождались под землёй — физика выплёвывала их кривыми
+                Vector3 p = positions[i];
+                if (terrain != null) p.y = TerrainBuilder.HeightAt(terrain, p);
+                go.transform.position = p + Vector3.up * 1.2f;
                 list.Add(go.transform);
             }
             return list;
+        }
+
+        /// <summary>Рисует подложку миникарты (дороги, город, промзона, железка, лес, точки старта)
+        /// по тем же координатам, что и расстановка объектов в BuildWorld — чтобы карта
+        /// совпадала с миром. Сохранив в PNG, отдаём через HUD.minimapBg.</summary>
+        static Texture2D BuildMinimapTexture()
+        {
+            const int R = 512;
+            var tex = new Texture2D(R, R, TextureFormat.RGBA32, false);
+            var px = new Color[R * R];
+            Color field = new Color(0.20f, 0.27f, 0.16f);      // поле
+            Color road = new Color(0.62f, 0.57f, 0.47f);       // асфальт
+            Color city = new Color(0.47f, 0.45f, 0.41f);       // город
+            Color ind = new Color(0.38f, 0.34f, 0.31f);        // промзона
+            Color forest = new Color(0.10f, 0.18f, 0.10f);     // лес
+            Color rail = new Color(0.25f, 0.22f, 0.20f);       // железная дорога
+
+            for (int y = 0; y < R; y++)
+                for (int x = 0; x < R; x++)
+                {
+                    // пиксель → мир: карта от −1500 до +1500, юг внизу (текстура снизу вверх)
+                    float wx = (x + 0.5f) / R * TerrainBuilder.SizeMeters - TerrainBuilder.SizeMeters * 0.5f;
+                    float wz = (y + 0.5f) / R * TerrainBuilder.SizeMeters - TerrainBuilder.SizeMeters * 0.5f;
+                    var c = field;
+
+                    // западный лес — тот же шум Перлина, что фильтрует посадку деревьев
+                    if (wx < -200f && wx > -1450f && wz > -1300f && wz < 1300f)
+                    {
+                        float density = Mathf.PerlinNoise(wx / 380f, wz / 380f);
+                        if (density > 0.38f) c = Color.Lerp(field, forest,
+                            Mathf.Clamp01((density - 0.38f) / 0.14f));
+                    }
+                    // город: 5×5 кварталов примерно −220…220
+                    if (wx > -225f && wx < 225f && wz > -225f && wz < 225f) c = city;
+                    // промзона: ангары + поле контейнеров
+                    bool industrial = (wx > 250f && wx < 1000f && wz > -420f && wz < 800f) ||
+                                      (wx > -550f && wx < -300f && wz > 350f && wz < 650f);
+                    if (industrial) c = ind;
+                    // железная дорога: магистраль Z=−420, ветка к станции Z=330
+                    if (Mathf.Abs(wz + 420f) < 10f) c = rail;
+                    if (Mathf.Abs(wz - 330f) < 10f && wx < -450f) c = rail;
+                    // дороги — последними, поверх всего
+                    if (TerrainBuilder.DistanceToRoad(wx, wz) < 13f) c = road;
+
+                    px[y * R + x] = c;
+                }
+
+            // точки старта — жёлтые точки по кольцу (те же SpawnPositions)
+            foreach (var s in SpawnPositions())
+            {
+                int mx = Mathf.RoundToInt((s.x + TerrainBuilder.SizeMeters * 0.5f) / TerrainBuilder.SizeMeters * R);
+                int my = Mathf.RoundToInt((s.z + TerrainBuilder.SizeMeters * 0.5f) / TerrainBuilder.SizeMeters * R);
+                for (int dy = -2; dy <= 2; dy++)
+                    for (int dx = -2; dx <= 2; dx++)
+                    {
+                        int xx = Mathf.Clamp(mx + dx, 0, R - 1), yy = Mathf.Clamp(my + dy, 0, R - 1);
+                        if (dx * dx + dy * dy <= 4) px[yy * R + xx] = new Color(0.95f, 0.8f, 0.25f);
+                    }
+            }
+
+            tex.SetPixels(px);
+            tex.Apply();
+            var path = "Assets/Textures/minimap_bg.png";
+            File.WriteAllBytes(path, tex.EncodeToPNG());
+            AssetDatabase.ImportAsset(path);
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
 
         static void BakeNavMesh()

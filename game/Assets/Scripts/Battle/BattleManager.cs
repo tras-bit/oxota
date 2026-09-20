@@ -128,9 +128,25 @@ namespace Samsar
             return list.ToArray();
         }
 
+        /// <summary>Высота земли в точке: луч сверху вниз (учитывает дома и насыпи),
+        /// запасной вариант — рельеф. Танки обязаны ставиться на землю, иначе
+        /// физика выплёвывает их из-под поверхности под диким углом.</summary>
+        public static float GroundY(Vector3 pos)
+        {
+            RaycastHit hit;
+            if (Physics.Raycast(pos + Vector3.up * 250f, Vector3.down, out hit, 500f,
+                                ~0, QueryTriggerInteraction.Ignore))
+                return hit.point.y;
+            var t = Terrain.activeTerrain;
+            if (t != null) return t.SampleHeight(pos) + t.transform.position.y;
+            return pos.y;
+        }
+
         public TankController SpawnTank(string specId, bool isPlayer, bool isAlly, string callsign, Vector3 pos,
                                         bool isMarauder = false)
         {
+            // точка спавна может висеть в воздухе или под землёй — ставим на землю
+            pos = new Vector3(pos.x, GroundY(pos) + 0.6f, pos.z);
             var spec = TankSpec.Get(specId);
             var model = library != null ? library.Get(spec.id) : null;
             GameObject go;

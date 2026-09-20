@@ -17,7 +17,9 @@ namespace Samsar.EditorTools
     {
         // Поднять Version, чтобы у всех, у кого проект уже открыт, сцены пересобрались заново.
         // v2: камуфляжи спецмашин + сгоревшие танки на карте.
-        const string Version = "2";
+        // v3: объекты и точки спавна ставятся по высоте рельефа (карта больше не тонет),
+        //     у миникарты появилась подложка с дорогами и городом.
+        const string Version = "3";
         const string MarkerPath = "Assets/Samsar.autobuild";
         const string MainScene = "Assets/Scenes/Main.unity";
         const string BattleScene = "Assets/Scenes/Battle.unity";
